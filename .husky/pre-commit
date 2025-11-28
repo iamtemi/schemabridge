@@ -1,0 +1,16 @@
+# Run format check and auto-fix if needed
+if ! pnpm format:check; then
+  echo "Formatting issues found. Auto-fixing..."
+  pnpm format
+  git add -u
+  echo "Formatted files staged. Please review and commit again."
+fi
+
+# Run lint check
+pnpm lint
+
+# Run type check
+pnpm typecheck
+
+# Run tests (quick, no coverage for pre-commit)
+pnpm test

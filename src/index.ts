@@ -5,6 +5,9 @@
  */
 
 import type { ZodTypeAny } from 'zod';
+import { emitPydanticModel } from './core/emitters/pydantic.js';
+import { emitTypeScriptDefinitions } from './core/emitters/typescript.js';
+import { visitZodSchema } from './core/ast/zod-visitor.js';
 
 export type Target = 'pydantic' | 'typescript';
 
@@ -30,6 +33,14 @@ export interface SchemaConversionOptions {
    * pre-loaded schema instances and don't perform import resolution themselves.
    */
   allowUnresolved?: boolean;
+
+  /**
+   * Map of field paths to custom export names for TypeScript interfaces.
+   * Keys are dot-separated field paths (e.g., "user.profile").
+   * Values are the desired interface/type names.
+   * Example: { "user.profile": "UserProfile", "metadata": "CustomMetadata" }
+   */
+  exportNameOverrides?: Record<string, string>;
 }
 
 /**
@@ -37,9 +48,19 @@ export interface SchemaConversionOptions {
  * - Pure function: no filesystem or process I/O.
  * - Does not write files or log to stdout.
  */
-export function convertZodToPydantic(_schema: ZodTypeAny, _options: SchemaConversionOptions): string {
-  // TODO: Implementation placeholder
-  throw new Error('Not implemented yet');
+export function convertZodToPydantic(schema: ZodTypeAny, options: SchemaConversionOptions): string {
+  const { node, warnings } = visitZodSchema(schema);
+  if (node.type !== 'object') {
+    throw new Error('Root schema must be a Zod object to generate Pydantic models.');
+  }
+  const emitOptions: { name: string; sourceModule?: string; warnings?: typeof warnings } = {
+    name: options.name,
+    warnings,
+  };
+  if (options.sourceModule !== undefined) {
+    emitOptions.sourceModule = options.sourceModule;
+  }
+  return emitPydanticModel(node, emitOptions);
 }
 
 /**
@@ -48,11 +69,29 @@ export function convertZodToPydantic(_schema: ZodTypeAny, _options: SchemaConver
  * - Does not write files or log to stdout.
  */
 export function convertZodToTypescript(
-  _schema: ZodTypeAny,
-  _options: SchemaConversionOptions,
+  schema: ZodTypeAny,
+  options: SchemaConversionOptions,
 ): string {
-  // TODO: Implementation placeholder
-  throw new Error('Not implemented yet');
+  const { node, warnings } = visitZodSchema(schema);
+  if (node.type !== 'object') {
+    throw new Error('Root schema must be a Zod object to generate TypeScript interfaces.');
+  }
+  const emitOptions: {
+    name: string;
+    sourceModule?: string;
+    warnings?: typeof warnings;
+    exportNameOverrides?: Record<string, string>;
+  } = {
+    name: options.name,
+    warnings,
+  };
+  if (options.sourceModule !== undefined) {
+    emitOptions.sourceModule = options.sourceModule;
+  }
+  if (options.exportNameOverrides !== undefined) {
+    emitOptions.exportNameOverrides = options.exportNameOverrides;
+  }
+  return emitTypeScriptDefinitions(node, emitOptions);
 }
 
 export interface GenerateFilesFromZodOptions extends SchemaConversionOptions {
@@ -89,9 +128,9 @@ export interface GeneratedFile {
  * - Accepts a target and `out` path that follow the same rules as the CLI.
  * - Returns metadata about the files that were written.
  */
-export async function generateFilesFromZod(
+export function generateFilesFromZod(
   _options: GenerateFilesFromZodOptions,
 ): Promise<GeneratedFile[]> {
   // TODO: Implementation placeholder
-  throw new Error('Not implemented yet');
+  return Promise.reject(new Error('Not implemented yet'));
 }

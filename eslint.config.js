@@ -36,7 +36,15 @@ export default [
     },
   },
   {
-    ignores: ['dist/', 'node_modules/', 'coverage/', 'bin/*.js', '*.config.js'],
+    ignores: [
+      'dist/',
+      'node_modules/',
+      'coverage/',
+      'bin/*.js',
+      '*.config.js',
+      'tests/**/*',
+      'vitest.config.ts',
+    ],
   },
   prettier,
 ];

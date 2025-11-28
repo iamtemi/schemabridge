@@ -10,5 +10,6 @@ export type {
   SchemaNode,
   StringConstraints,
   NumberConstraints,
-  IntConstraints,
+  VisitorWarning,
+  VisitResult,
 } from './zod-visitor.js';
