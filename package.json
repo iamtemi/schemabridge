@@ -1,0 +1,83 @@
+{
+  "name": "schemabridge",
+  "version": "0.1.0",
+  "description": "Cross-language schema converter: Zod to Pydantic and TypeScript",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "bin": {
+    "schemabridge": "./bin/schemabridge.js"
+  },
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsc --project tsconfig.build.json",
+    "dev": "tsx src/cli/index.ts",
+    "test": "vitest",
+    "test:unit": "vitest run tests/unit",
+    "test:integration": "vitest run tests/integration",
+    "test:watch": "vitest watch",
+    "test:coverage": "vitest run --coverage",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "ci": "pnpm typecheck && pnpm lint && pnpm format:check && pnpm test:coverage",
+    "prepublishOnly": "pnpm run build"
+  },
+  "keywords": [
+    "zod",
+    "pydantic",
+    "typescript",
+    "python",
+    "schema",
+    "converter",
+    "codegen",
+    "type-generation"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "zod": "^4.1.13"
+  },
+  "peerDependencies": {
+    "zod": "^3.25.0 || ^4.0.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.1",
+    "@types/node": "^22.19.1",
+    "@typescript-eslint/eslint-plugin": "^8.48.0",
+    "@typescript-eslint/parser": "^8.48.0",
+    "@vitest/coverage-v8": "^2.1.9",
+    "eslint": "^9.39.1",
+    "eslint-config-prettier": "^9.1.2",
+    "globals": "^16.5.0",
+    "prettier": "^3.7.1",
+    "tsx": "^4.20.6",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.48.0",
+    "vitest": "^2.1.9"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/iamtemi/schemabridge.git"
+  },
+  "bugs": {
+    "url": "https://github.com/iamtemi/schemabridge/issues"
+  },
+  "files": [
+    "dist",
+    "bin",
+    "python",
+    "README.md",
+    "LICENSE"
+  ]
+}
