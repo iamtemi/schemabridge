@@ -45,10 +45,8 @@ jobs:
 
       - name: Publish to npm
         run: npm publish --provenance --access public
-        env:
-          # Temporary: using token for first publish (passkey 2FA doesn't work with CLI)
-          # After first publish, remove NPM_TOKEN and this will use OIDC automatically
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        # Uses npm Trusted Publishing (OIDC) - no token needed!
+        # This bypasses 2FA requirements. Requires: id-token: write permission (already set above)
 
   publish-pypi:
     name: Publish to PyPI
@@ -92,3 +90,7 @@ jobs:
 
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          # Temporary: using API token for first publish
+          # After first publish, set up trusted publishing and remove this
+          password: ${{ secrets.PYPI_API_TOKEN }}
