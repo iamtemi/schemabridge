@@ -105,7 +105,7 @@ jobs:
 
       - name: Publish to npm
         if: github.event_name != 'workflow_dispatch' || github.event.inputs.dry_run != 'true'
-        run: npm publish --provenance --access public --ignore-scripts
+        run: npm publish --access public --ignore-scripts
         # IMPORTANT: This uses npm Trusted Publishing (OIDC).
         # --ignore-scripts is used because we've already built everything in the build job.
 
