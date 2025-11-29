@@ -103,10 +103,40 @@ function renderField(
   currentClass: string,
 ): string {
   const { annotation, defaultCode } = buildAnnotation(node, ctx, path, currentClass);
-  if (defaultCode !== undefined) {
-    return `${fieldName}: ${annotation} = ${defaultCode}`;
+  const needsAlias = !isValidPythonIdentifier(fieldName);
+  const pythonName = needsAlias ? toPythonIdentifier(fieldName) : fieldName;
+
+  const fieldParts: string[] = [];
+  if (needsAlias) {
+    ctx.pydanticImports.add('Field');
+    fieldParts.push(`alias="${fieldName}"`);
   }
-  return `${fieldName}: ${annotation}`;
+  if (defaultCode !== undefined) {
+    // If defaultCode already uses Field(), extract the parts
+    if (defaultCode.startsWith('Field(')) {
+      ctx.pydanticImports.add('Field');
+      const inner = defaultCode.slice(6, -1); // Remove "Field(" and ")"
+      if (needsAlias) {
+        fieldParts.push(inner);
+      } else {
+        // If we don't need alias, we can use the Field() directly
+        return `${pythonName}: ${annotation} = ${defaultCode}`;
+      }
+    } else {
+      if (needsAlias) {
+        ctx.pydanticImports.add('Field');
+        fieldParts.push(`default=${defaultCode}`);
+      } else {
+        // No alias needed, use default directly
+        return `${pythonName}: ${annotation} = ${defaultCode}`;
+      }
+    }
+  }
+
+  if (fieldParts.length > 0) {
+    return `${pythonName}: ${annotation} = Field(${fieldParts.join(', ')})`;
+  }
+  return `${pythonName}: ${annotation}`;
 }
 
 interface TypeBuild {
@@ -174,7 +204,7 @@ function buildType(
         }
         if (constraints.regex !== undefined) {
           const constName = registerRegex(constraints.regex, path, ctx);
-          parts.push(`regex=${constName}`);
+          parts.push(`pattern=${constName}`);
         }
         return { annotation: `constr(${parts.join(', ')})` };
       }
@@ -536,6 +566,21 @@ function toConstantName(value: string): string {
     .replace(/[^a-zA-Z0-9]+/g, '_')
     .replace(/([a-z0-9])([A-Z])/g, '$1_$2')
     .toUpperCase();
+}
+
+function isValidPythonIdentifier(name: string): boolean {
+  // Python identifiers must start with a letter or underscore, and contain only letters, digits, and underscores
+  return /^[a-zA-Z_][a-zA-Z0-9_]*$/.test(name);
+}
+
+function toPythonIdentifier(name: string): string {
+  // Convert invalid identifier to valid one by replacing invalid chars with underscores
+  // and ensuring it starts with a letter or underscore
+  let result = name.replace(/[^a-zA-Z0-9_]/g, '_');
+  if (!/^[a-zA-Z_]/.test(result)) {
+    result = `_${result}`;
+  }
+  return result;
 }
 
 function collectObjectNodes(

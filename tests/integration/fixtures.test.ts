@@ -5,6 +5,8 @@ import path from 'node:path';
 
 import { loadZodSchema } from '../../src/core/loader/index.js';
 import { convertZodToPydantic, convertZodToTypescript } from '../../src/index.js';
+import { assertValidPythonSyntax } from '../../src/utils/python-validator.js';
+import { assertValidTypeScriptSyntax } from '../../src/utils/typescript-validator.js';
 
 const makeTempDir = async () => fs.mkdtemp(path.join(os.tmpdir(), 'schemabridge-integration-'));
 const cleanupDirs: string[] = [];
@@ -53,7 +55,7 @@ describe('Integration tests for complex fixtures', () => {
   for (const fixture of fixtures) {
     describe(`${fixture.name}`, () => {
       it('loads schema successfully', async () => {
-        const schema = await loadZodSchema({
+        const { schema } = await loadZodSchema({
           file: fixture.file,
           exportName: fixture.exportName,
         });
@@ -61,7 +63,7 @@ describe('Integration tests for complex fixtures', () => {
       });
 
       it('converts to Pydantic successfully', async () => {
-        const schema = await loadZodSchema({
+        const { schema } = await loadZodSchema({
           file: fixture.file,
           exportName: fixture.exportName,
         });
@@ -84,10 +86,13 @@ describe('Integration tests for complex fixtures', () => {
         // Verify it's valid Python syntax (basic check)
         expect(pydanticCode).not.toContain('undefined');
         // Note: Python uses None, not null, but 'null' might appear in string literals or comments
+
+        // Validate Python syntax
+        await assertValidPythonSyntax(pydanticCode);
       });
 
       it('converts to TypeScript successfully', async () => {
-        const schema = await loadZodSchema({
+        const { schema } = await loadZodSchema({
           file: fixture.file,
           exportName: fixture.exportName,
         });
@@ -106,10 +111,13 @@ describe('Integration tests for complex fixtures', () => {
         expect(tsCode).toMatch(/export interface \w+\s*\{/);
         // Verify it's valid TypeScript syntax (basic check)
         // Note: TypeScript uses undefined and null, so we don't check for their absence
+
+        // Validate TypeScript syntax
+        assertValidTypeScriptSyntax(tsCode);
       });
 
       it('generates valid nested structures', async () => {
-        const schema = await loadZodSchema({
+        const { schema } = await loadZodSchema({
           file: fixture.file,
           exportName: fixture.exportName,
         });
@@ -137,7 +145,7 @@ describe('Integration tests for complex fixtures', () => {
       });
 
       it('preserves constraints in Pydantic output', async () => {
-        const schema = await loadZodSchema({
+        const { schema } = await loadZodSchema({
           file: fixture.file,
           exportName: fixture.exportName,
         });
@@ -159,7 +167,7 @@ describe('Integration tests for complex fixtures', () => {
       });
 
       it('handles optional/nullable fields correctly', async () => {
-        const schema = await loadZodSchema({
+        const { schema } = await loadZodSchema({
           file: fixture.file,
           exportName: fixture.exportName,
         });

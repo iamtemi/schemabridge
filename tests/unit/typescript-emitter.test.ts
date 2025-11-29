@@ -5,6 +5,7 @@ import { convertZodToTypescript } from '../../src/index.js';
 import { emitTypeScriptDefinitions } from '../../src/core/emitters/typescript.js';
 import { visitZodSchema } from '../../src/core/ast/zod-visitor.js';
 import type { VisitorWarning } from '../../src/core/ast/index.js';
+import { assertValidTypeScriptSyntax } from '../../src/utils/typescript-validator.js';
 
 describe('emitTypeScriptDefinitions', () => {
   it('renders basic types correctly', () => {
@@ -16,6 +17,9 @@ describe('emitTypeScriptDefinitions', () => {
 
     const code = convertZodToTypescript(schema, { name: 'User' }).trim();
 
+    // Validate syntax
+    assertValidTypeScriptSyntax(code);
+
     expect(code).toBe(
       [
         'export interface User {',
@@ -25,6 +29,9 @@ describe('emitTypeScriptDefinitions', () => {
         '}',
       ].join('\n'),
     );
+
+    // Validate syntax
+    assertValidTypeScriptSyntax(code);
   });
 
   it('renders nested objects as separate interfaces', () => {
@@ -38,6 +45,9 @@ describe('emitTypeScriptDefinitions', () => {
     });
 
     const code = convertZodToTypescript(schema, { name: 'Root' }).trim();
+
+    // Validate syntax
+    assertValidTypeScriptSyntax(code);
 
     expect(code).toBe(
       [
@@ -55,6 +65,9 @@ describe('emitTypeScriptDefinitions', () => {
         '}',
       ].join('\n'),
     );
+
+    // Validate syntax
+    assertValidTypeScriptSyntax(code);
   });
 
   it('handles optional, nullable, and nullish fields', () => {
@@ -67,6 +80,9 @@ describe('emitTypeScriptDefinitions', () => {
 
     const code = convertZodToTypescript(schema, { name: 'Test' }).trim();
 
+    // Validate syntax
+    assertValidTypeScriptSyntax(code);
+
     expect(code).toBe(
       [
         'export interface Test {',
@@ -77,6 +93,9 @@ describe('emitTypeScriptDefinitions', () => {
         '}',
       ].join('\n'),
     );
+
+    // Validate syntax
+    assertValidTypeScriptSyntax(code);
   });
 
   it('handles arrays', () => {
@@ -92,6 +111,9 @@ describe('emitTypeScriptDefinitions', () => {
 
     const code = convertZodToTypescript(schema, { name: 'ArrayTest' }).trim();
 
+    // Validate syntax
+    assertValidTypeScriptSyntax(code);
+
     expect(code).toBe(
       [
         'export interface NestedItem {',
@@ -105,6 +127,9 @@ describe('emitTypeScriptDefinitions', () => {
         '}',
       ].join('\n'),
     );
+
+    // Validate syntax
+    assertValidTypeScriptSyntax(code);
   });
 
   it('handles unions', () => {
@@ -115,6 +140,9 @@ describe('emitTypeScriptDefinitions', () => {
 
     const code = convertZodToTypescript(schema, { name: 'UnionTest' }).trim();
 
+    // Validate syntax
+    assertValidTypeScriptSyntax(code);
+
     expect(code).toBe(
       [
         'export interface UnionTest {',
@@ -123,6 +151,9 @@ describe('emitTypeScriptDefinitions', () => {
         '}',
       ].join('\n'),
     );
+
+    // Validate syntax
+    assertValidTypeScriptSyntax(code);
   });
 
   it('handles enums as union of string literals', () => {
@@ -132,11 +163,17 @@ describe('emitTypeScriptDefinitions', () => {
 
     const code = convertZodToTypescript(schema, { name: 'EnumTest' }).trim();
 
+    // Validate syntax
+    assertValidTypeScriptSyntax(code);
+
     expect(code).toBe(
       ['export interface EnumTest {', '  status: "pending" | "done" | "cancelled";', '}'].join(
         '\n',
       ),
     );
+
+    // Validate syntax
+    assertValidTypeScriptSyntax(code);
   });
 
   it('handles literals', () => {
@@ -148,6 +185,9 @@ describe('emitTypeScriptDefinitions', () => {
 
     const code = convertZodToTypescript(schema, { name: 'LiteralTest' }).trim();
 
+    // Validate syntax
+    assertValidTypeScriptSyntax(code);
+
     expect(code).toBe(
       [
         'export interface LiteralTest {',
@@ -157,6 +197,9 @@ describe('emitTypeScriptDefinitions', () => {
         '}',
       ].join('\n'),
     );
+
+    // Validate syntax
+    assertValidTypeScriptSyntax(code);
   });
 
   it('handles date and datetime', () => {
@@ -167,9 +210,14 @@ describe('emitTypeScriptDefinitions', () => {
 
     const code = convertZodToTypescript(schema, { name: 'DateTest' }).trim();
 
+    // Validate syntax
+    assertValidTypeScriptSyntax(code);
+
     expect(code).toBe(
       ['export interface DateTest {', '  createdAt: Date;', '  updatedAt: string;', '}'].join('\n'),
     );
+
+    // Validate syntax
   });
 
   it('handles uuid as string', () => {
@@ -178,6 +226,9 @@ describe('emitTypeScriptDefinitions', () => {
     });
 
     const code = convertZodToTypescript(schema, { name: 'UuidTest' }).trim();
+
+    // Validate syntax
+    assertValidTypeScriptSyntax(code);
 
     expect(code).toBe(['export interface UuidTest {', '  id: string;', '}'].join('\n'));
   });
@@ -188,6 +239,9 @@ describe('emitTypeScriptDefinitions', () => {
     });
 
     const code = convertZodToTypescript(schema, { name: 'IntTest' }).trim();
+
+    // Validate syntax
+    assertValidTypeScriptSyntax(code);
 
     expect(code).toBe(['export interface IntTest {', '  count: number;', '}'].join('\n'));
   });
@@ -209,6 +263,9 @@ describe('emitTypeScriptDefinitions', () => {
 
     const code = convertZodToTypescript(schema, { name: 'ComplexTest' }).trim();
 
+    // Validate syntax
+    assertValidTypeScriptSyntax(code);
+
     expect(code).toBe(
       [
         'export interface UserMetadata {',
@@ -228,6 +285,9 @@ describe('emitTypeScriptDefinitions', () => {
         '}',
       ].join('\n'),
     );
+
+    // Validate syntax
+    assertValidTypeScriptSyntax(code);
   });
 
   it('handles union with nested objects', () => {
@@ -246,6 +306,9 @@ describe('emitTypeScriptDefinitions', () => {
 
     const code = convertZodToTypescript(schema, { name: 'UnionNestedTest' }).trim();
 
+    // Validate syntax
+    assertValidTypeScriptSyntax(code);
+
     expect(code).toBe(
       [
         'export interface PayloadOption0 {',
@@ -263,12 +326,18 @@ describe('emitTypeScriptDefinitions', () => {
         '}',
       ].join('\n'),
     );
+
+    // Validate syntax
+    assertValidTypeScriptSyntax(code);
   });
 
   it('handles empty objects', () => {
     const schema = z.object({});
 
     const code = convertZodToTypescript(schema, { name: 'EmptyTest' }).trim();
+
+    // Validate syntax
+    assertValidTypeScriptSyntax(code);
 
     expect(code).toBe(['export interface EmptyTest {}'].join('\n'));
   });
@@ -287,12 +356,18 @@ describe('emitTypeScriptDefinitions', () => {
 
     const code = convertZodToTypescript(schema, { name: 'MultiUnion' }).trim();
 
+    // Validate syntax
+    assertValidTypeScriptSyntax(code);
+
     expect(code).toContain('export interface PayloadOption0');
     expect(code).toContain('export interface PayloadOption1');
     expect(code).toContain('export interface OtherOption0');
     expect(code).toContain('export interface OtherOption1');
     expect(code).toContain('payload: PayloadOption0 | PayloadOption1;');
     expect(code).toContain('other: OtherOption0 | OtherOption1;');
+
+    // Validate syntax
+    assertValidTypeScriptSyntax(code);
   });
 
   it('handles any and unknown types', () => {
@@ -303,11 +378,17 @@ describe('emitTypeScriptDefinitions', () => {
 
     const code = convertZodToTypescript(schema, { name: 'AnyTest' }).trim();
 
+    // Validate syntax
+    assertValidTypeScriptSyntax(code);
+
     expect(code).toBe(
       ['export interface AnyTest {', '  anyField: any;', '  unknownField: unknown;', '}'].join(
         '\n',
       ),
     );
+
+    // Validate syntax
+    assertValidTypeScriptSyntax(code);
   });
 
   it('handles defaults by unwrapping them', () => {
@@ -318,9 +399,15 @@ describe('emitTypeScriptDefinitions', () => {
 
     const code = convertZodToTypescript(schema, { name: 'DefaultTest' }).trim();
 
+    // Validate syntax
+    assertValidTypeScriptSyntax(code);
+
     expect(code).toBe(
       ['export interface DefaultTest {', '  name: string;', '  tags: string[];', '}'].join('\n'),
     );
+
+    // Validate syntax
+    assertValidTypeScriptSyntax(code);
   });
 
   it('handles export name overrides', () => {
@@ -381,6 +468,9 @@ describe('emitTypeScriptDefinitions', () => {
 
     const code = convertZodToTypescript(schema, { name: 'NestedOptionalTest' }).trim();
 
+    // Validate syntax
+    assertValidTypeScriptSyntax(code);
+
     expect(code).toBe(
       [
         'export interface NestedOptionalTest {',
@@ -390,6 +480,9 @@ describe('emitTypeScriptDefinitions', () => {
         '}',
       ].join('\n'),
     );
+
+    // Validate syntax
+    assertValidTypeScriptSyntax(code);
   });
 
   it('handles arrays of unions', () => {
@@ -399,9 +492,15 @@ describe('emitTypeScriptDefinitions', () => {
 
     const code = convertZodToTypescript(schema, { name: 'ArrayUnionTest' }).trim();
 
+    // Validate syntax
+    assertValidTypeScriptSyntax(code);
+
     expect(code).toBe(
       ['export interface ArrayUnionTest {', '  items: (string | number)[];', '}'].join('\n'),
     );
+
+    // Validate syntax
+    assertValidTypeScriptSyntax(code);
   });
 
   it('handles arrays with optional elements', () => {
@@ -411,9 +510,15 @@ describe('emitTypeScriptDefinitions', () => {
 
     const code = convertZodToTypescript(schema, { name: 'ArrayOptionalTest' }).trim();
 
+    // Validate syntax
+    assertValidTypeScriptSyntax(code);
+
     expect(code).toBe(
       ['export interface ArrayOptionalTest {', '  items: (string | undefined)[];', '}'].join('\n'),
     );
+
+    // Validate syntax
+    assertValidTypeScriptSyntax(code);
   });
 });
 

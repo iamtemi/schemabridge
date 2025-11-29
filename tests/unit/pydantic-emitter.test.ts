@@ -5,9 +5,10 @@ import { convertZodToPydantic } from '../../src/index.js';
 import { emitPydanticModel } from '../../src/core/emitters/pydantic.js';
 import { visitZodSchema } from '../../src/core/ast/zod-visitor.js';
 import type { VisitorWarning } from '../../src/core/ast/index.js';
+import { assertValidPythonSyntax } from '../../src/utils/python-validator.js';
 
 describe('emitPydanticModel', () => {
-  it('renders nested objects, regex constraints, and arrays', () => {
+  it('renders nested objects, regex constraints, and arrays', async () => {
     const versionPattern = /^v\d{6}-\d{2}-\d+\.\d+\.\d+$/;
     const schema = z.object({
       version: z.string().regex(versionPattern),
@@ -30,13 +31,16 @@ describe('emitPydanticModel', () => {
         '    class Normalized(BaseModel):',
         '        description: str',
         '        description_tokens: List[str]',
-        '    version: constr(regex=VERSION_REGEX)',
+        '    version: constr(pattern=VERSION_REGEX)',
         '    normalized: Normalized',
       ].join('\n'),
     );
+
+    // Validate syntax
+    await assertValidPythonSyntax(code);
   });
 
-  it('handles defaults, optionals, and typed defaults', () => {
+  it('handles defaults, optionals, and typed defaults', async () => {
     const schema = z.object({
       id: z.string().uuid(),
       tags: z.array(z.string()).default([]),
@@ -62,9 +66,12 @@ describe('emitPydanticModel', () => {
         '    created_at: Optional[datetime] = None',
       ].join('\n'),
     );
+
+    // Validate syntax
+    await assertValidPythonSyntax(code);
   });
 
-  it('renders unions, literals, and constrained numbers', () => {
+  it('renders unions, literals, and constrained numbers', async () => {
     const schema = z.object({
       status: z.enum(['pending', 'done']),
       payload: z.union([
@@ -97,9 +104,12 @@ describe('emitPydanticModel', () => {
         '    payload: Union[PayloadOption0, PayloadOption1]',
       ].join('\n'),
     );
+
+    // Validate syntax
+    await assertValidPythonSyntax(code);
   });
 
-  it('avoids collisions across multiple unions by prefixing option names', () => {
+  it('avoids collisions across multiple unions by prefixing option names', async () => {
     const schema = z.object({
       payload: z.union([
         z.object({ kind: z.literal('a'), value: z.number() }),
@@ -119,9 +129,12 @@ describe('emitPydanticModel', () => {
     expect(code).toContain('class OtherOption1(BaseModel):');
     expect(code).toContain('payload: Union[PayloadOption0, PayloadOption1]');
     expect(code).toContain('other: Union[OtherOption0, OtherOption1]');
+
+    // Validate syntax
+    await assertValidPythonSyntax(code);
   });
 
-  it('disambiguates colliding paths by using full path naming', () => {
+  it('disambiguates colliding paths by using full path naming', async () => {
     const schema = z.object({
       foo_bar: z.object({
         value: z.string(),
@@ -134,6 +147,9 @@ describe('emitPydanticModel', () => {
     const code = convertZodToPydantic(schema, { name: 'CollisionTest' }).trim();
     expect(code).toContain('class FooBar(BaseModel):');
     expect(code).toContain('class FooBar2(BaseModel):');
+
+    // Validate syntax
+    await assertValidPythonSyntax(code);
   });
 
   it('generates warning for unmapped regex flags', () => {

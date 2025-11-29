@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import process from 'node:process';
@@ -10,6 +9,7 @@ interface ParsedArgs {
   target: Target | 'all';
   out?: string;
   allowUnresolved: boolean;
+  tsconfigPath?: string;
 }
 
 const USAGE = `
@@ -24,11 +24,17 @@ Examples:
 export async function runCLI(argv: string[] = process.argv.slice(2)): Promise<number> {
   try {
     const parsed = parseArgs(argv);
-    const schema = await loadZodSchema({
+    const { schema, warnings } = await loadZodSchema({
       file: parsed.inputFile,
       exportName: parsed.exportName,
       registerTsLoader: true,
+      ...(parsed.tsconfigPath !== undefined && { tsconfigPath: parsed.tsconfigPath }),
+      allowUnresolved: parsed.allowUnresolved,
     });
+
+    for (const warning of warnings) {
+      console.warn(`Warning: ${warning}`);
+    }
 
     const generateOptions: Parameters<typeof generateFilesFromZod>[0] = {
       schema,
@@ -81,6 +87,7 @@ function parseArgs(argv: string[]): ParsedArgs {
   let target: Target | 'all' = 'pydantic';
   let out: string | undefined;
   let allowUnresolved = false;
+  let tsconfigPath: string | undefined;
 
   for (let i = 1; i < rest.length; i++) {
     const arg = rest[i];
@@ -117,6 +124,14 @@ function parseArgs(argv: string[]): ParsedArgs {
       case '--allow-unresolved':
         allowUnresolved = true;
         break;
+      case '--tsconfig': {
+        const val = rest[++i];
+        if (!val || val.startsWith('-')) {
+          throw new Error('--tsconfig requires a value: --tsconfig <path>');
+        }
+        tsconfigPath = val;
+        break;
+      }
       default:
         if (arg.startsWith('-')) {
           throw new Error(`Unknown option: ${arg}`);
@@ -135,6 +150,7 @@ function parseArgs(argv: string[]): ParsedArgs {
     exportName,
     target,
     allowUnresolved,
+    ...(tsconfigPath !== undefined && { tsconfigPath }),
   };
   if (out !== undefined) {
     result.out = out;

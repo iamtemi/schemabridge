@@ -1,0 +1,1129 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`Pydantic Code Generation Snapshots > generates consistent output for API request schema 1`] = `
+"from pydantic import BaseModel, Field, confloat, conint, constr
+from typing import Any, Literal, Optional, Union
+from datetime import date
+
+class ApiRequestSchema(BaseModel):
+    class Headers(BaseModel):
+        Content_Type: str = Field(alias="Content-Type")
+        Authorization: Optional[str] = None
+        X_Request_ID: Optional[str] = Field(alias="X-Request-ID", default=None)
+        User_Agent: Optional[str] = Field(alias="User-Agent", default=None)
+    class Query(BaseModel):
+        class QueryFilters(BaseModel):
+            status: Optional[Literal["active", "inactive", "pending"]] = None
+            dateFrom: Optional[str] = None
+            dateTo: Optional[str] = None
+            minPrice: Optional[confloat(ge=0)] = None
+            maxPrice: Optional[confloat(ge=0)] = None
+        class QueryPagination(BaseModel):
+            page: conint(ge=1) = Field(default=1)
+            limit: conint(ge=1, le=100) = Field(default=20)
+            sortBy: Optional[Literal["created_at", "updated_at", "name"]] = None
+            sortOrder: Literal["asc", "desc"] = Field(default="desc")
+        search: Optional[str] = None
+        filters: Optional[QueryFilters] = None
+        pagination: Optional[QueryPagination] = None
+    class BodyOption0(BaseModel):
+        class BodyOption0Data(BaseModel):
+            name: constr(min_length=1)
+            email: str
+            age: Optional[conint(ge=0)] = None
+        type: Literal["create"]
+        data: BodyOption0Data
+    class BodyOption1(BaseModel):
+        class BodyOption1Data(BaseModel):
+            name: Optional[constr(min_length=1)] = None
+            email: Optional[str] = None
+        type: Literal["update"]
+        id: str
+        data: BodyOption1Data
+    class BodyOption2(BaseModel):
+        type: Literal["delete"]
+        id: str
+        reason: Optional[str] = None
+    class Response(BaseModel):
+        class ResponseError(BaseModel):
+            code: str
+            message: str
+            details: Optional[Any] = None
+        class ResponseMeta(BaseModel):
+            class ResponseMetaPagination(BaseModel):
+                page: conint(ge=1) = Field(default=1)
+                limit: conint(ge=1, le=100) = Field(default=20)
+                sortBy: Optional[Literal["created_at", "updated_at", "name"]] = None
+                sortOrder: Literal["asc", "desc"] = Field(default="desc")
+            requestId: str
+            timestamp: date
+            duration: confloat(ge=0)
+            pagination: Optional[ResponseMetaPagination] = None
+        success: bool
+        data: Optional[Any] = None
+        error: Optional[ResponseError] = None
+        meta: Optional[ResponseMeta] = None
+    method: Literal["GET", "POST", "PUT", "PATCH", "DELETE"]
+    path: str
+    headers: Headers
+    query: Optional[Query] = None
+    body: Union[BodyOption0, BodyOption1, BodyOption2]
+    response: Response"
+`;
+
+exports[`Pydantic Code Generation Snapshots > generates consistent output for comprehensive schema 1`] = `
+"from pydantic import BaseModel, Field, confloat, conint, constr
+from typing import Any, List, Literal, Optional, Union
+
+PHONE_REGEX = r"^\\+?[1-9]\\d{1,14}$"
+
+class ComprehensiveSchema(BaseModel):
+    class ItemsItem(BaseModel):
+        id: str
+        value: float
+    class Address(BaseModel):
+        class AddressCoordinates(BaseModel):
+            class AddressCoordinatesElevation(BaseModel):
+                meters: float
+                source: Optional[str] = None
+            lat: float
+            lng: float
+            elevation: AddressCoordinatesElevation
+        street: str
+        city: str
+        country: str
+        coordinates: AddressCoordinates
+    class Metadata(BaseModel):
+        key: str
+        value: str
+    class Settings(BaseModel):
+        theme: Literal["light", "dark"] = Field(default="light")
+        notifications: bool = Field(default=True)
+    class Config(BaseModel):
+        pass
+    class PaymentOption0(BaseModel):
+        method: Literal["credit_card"]
+        cardNumber: str
+        expiry: str
+    class PaymentOption1(BaseModel):
+        method: Literal["paypal"]
+        email: str
+    class PaymentOption2(BaseModel):
+        method: Literal["bank_transfer"]
+        accountNumber: str
+        routingNumber: str
+    class Profile(BaseModel):
+        class ProfileSocial(BaseModel):
+            twitter: Optional[str] = None
+            linkedin: Optional[str] = None
+            github: Optional[str] = None
+        bio: Optional[str] = None
+        avatar: Optional[str]
+        social: Optional[ProfileSocial] = None
+    name: constr(min_length=1, max_length=100)
+    email: str
+    phone: constr(pattern=PHONE_REGEX)
+    uuid: str
+    datetime: str
+    date: str
+    age: conint(ge=0, le=150)
+    score: confloat(gt=0)
+    rating: confloat(ge=0, le=5)
+    price: confloat(ge=0, le=10000)
+    quantity: confloat(ge=0)
+    isActive: bool
+    verified: bool = Field(default=False)
+    status: Literal["pending", "active", "inactive", "archived"]
+    priority: Literal["high"]
+    type: Union[Literal["user"], Literal["admin"], Literal["guest"]]
+    tags: List[str]
+    scores: List[conint()]
+    items: List[ItemsItem]
+    address: Address
+    middleName: Optional[str] = None
+    nickname: Optional[str]
+    alias: Optional[Optional[str]] = None
+    metadata: Optional[Metadata] = None
+    settings: Settings
+    preferences: List[str] = Field(default_factory=list)
+    config: Config = Field(default_factory=dict)
+    payment: Union[PaymentOption0, PaymentOption1, PaymentOption2]
+    extraData: Any
+    unknownField: Any
+    profile: Profile"
+`;
+
+exports[`Pydantic Code Generation Snapshots > generates consistent output for config schema 1`] = `
+"from pydantic import BaseModel, Field, conint, constr
+from typing import List, Literal, Optional
+
+class ConfigSchema(BaseModel):
+    class Server(BaseModel):
+        class ServerCors(BaseModel):
+            enabled: bool = Field(default=True)
+            origins: List[str] = Field(default_factory=list)
+        host: str = Field(default="0.0.0.0")
+        port: conint(ge=1, le=65535) = Field(default=3000)
+        cors: ServerCors
+    class Database(BaseModel):
+        class DatabasePool(BaseModel):
+            min: conint(ge=1) = Field(default=2)
+            max: conint(ge=1) = Field(default=10)
+            idleTimeout: conint(ge=0) = Field(default=30000)
+        host: str
+        port: conint(ge=1, le=65535)
+        database: str
+        username: str
+        password: str
+        ssl: bool = Field(default=False)
+        pool: DatabasePool
+    class Cache(BaseModel):
+        class CacheRedis(BaseModel):
+            host: Optional[str] = None
+            port: Optional[conint(ge=1, le=65535)] = None
+            password: Optional[str] = None
+        enabled: bool = Field(default=True)
+        type: Literal["memory", "redis", "memcached"] = Field(default="memory")
+        ttl: conint(ge=0) = Field(default=3600)
+        redis: Optional[CacheRedis] = None
+    class Logging(BaseModel):
+        class LoggingFile(BaseModel):
+            path: str = Field(default="./logs")
+            maxSize: conint(gt=0) = Field(default=10485760)
+            maxFiles: conint(gt=0) = Field(default=5)
+        level: Literal["debug", "info", "warn", "error"] = Field(default="info")
+        format: Literal["json", "text"] = Field(default="json")
+        output: Literal["console", "file", "both"] = Field(default="console")
+        file: Optional[LoggingFile] = None
+    class Features(BaseModel):
+        class FeaturesRateLimiting(BaseModel):
+            enabled: bool = Field(default=False)
+            maxRequests: conint(gt=0) = Field(default=100)
+            windowMs: conint(gt=0) = Field(default=60000)
+        enableAuth: bool = Field(default=True)
+        enableMetrics: bool = Field(default=False)
+        enableTracing: bool = Field(default=False)
+        rateLimiting: Optional[FeaturesRateLimiting] = None
+    class Secrets(BaseModel):
+        jwtSecret: constr(min_length=32)
+        apiKey: Optional[str] = None
+        encryptionKey: Optional[constr(min_length=32)] = None
+    class Validation(BaseModel):
+        strictMode: bool = Field(default=False)
+        allowUnknownFields: bool = Field(default=False)
+        maxDepth: conint(gt=0) = Field(default=10)
+    env: Literal["development", "staging", "production"] = Field(default="development")
+    debug: bool = Field(default=False)
+    server: Server
+    database: Database
+    cache: Cache
+    logging: Logging
+    features: Features
+    secrets: Optional[Secrets] = None
+    validation: Validation"
+`;
+
+exports[`Pydantic Code Generation Snapshots > generates consistent output for database entity schema 1`] = `
+"from pydantic import BaseModel, Field, conint, constr
+from typing import List, Literal, Optional
+from datetime import date, datetime
+from uuid import UUID
+
+USERNAME_REGEX = r"^[a-zA-Z0-9_]+$"
+
+class DatabaseEntitySchema(BaseModel):
+    class Metadata(BaseModel):
+        class MetadataPreferences(BaseModel):
+            theme: Literal["light", "dark", "auto"] = Field(default="auto")
+            language: str = Field(default="en")
+            notifications: bool = Field(default=True)
+        last_login: Optional[str]
+        login_count: conint(ge=0) = Field(default=0)
+        preferences: MetadataPreferences = Field(default_factory=dict)
+    class Organization(BaseModel):
+        id: str
+        name: str
+        domain: Optional[str] = None
+        created_at: date
+        updated_at: str
+        deleted_at: Optional[datetime]
+    class RolesItem(BaseModel):
+        id: str
+        name: str
+        permissions: List[str]
+        assigned_at: datetime
+    class Profile(BaseModel):
+        class ProfileLocation(BaseModel):
+            city: Optional[str] = None
+            country: Optional[str] = None
+            timezone: Optional[str] = None
+        class ProfileSocialLinks(BaseModel):
+            twitter: Optional[str] = None
+            linkedin: Optional[str] = None
+            github: Optional[str] = None
+        bio: Optional[constr(max_length=500)]
+        avatar_url: Optional[str]
+        location: Optional[ProfileLocation] = None
+        social_links: Optional[ProfileSocialLinks] = None
+    id: str
+    email: str
+    username: constr(min_length=3, max_length=50, pattern=USERNAME_REGEX)
+    full_name: constr(min_length=1, max_length=200)
+    status: Literal["active", "inactive", "suspended", "pending_verification"]
+    organization_id: Optional[UUID]
+    team_id: Optional[str] = None
+    created_at: date
+    updated_at: str
+    deleted_at: Optional[datetime]
+    metadata: Optional[Metadata] = None
+    organization: Optional[Organization] = None
+    roles: List[RolesItem]
+    profile: Optional[Profile] = None"
+`;
+
+exports[`Pydantic Code Generation Snapshots > generates consistent output for edge cases schema 1`] = `
+"from pydantic import BaseModel, Field, conint, constr
+from typing import Any, List, Literal, Optional, Union
+
+STRING_CONSTRAINTS_REGEX = r"^[a-z]+$"
+
+class EdgeCasesSchema(BaseModel):
+    class Level1(BaseModel):
+        class Level1Level2(BaseModel):
+            class Level1Level2Level3(BaseModel):
+                class Level1Level2Level3Level4(BaseModel):
+                    class Level1Level2Level3Level4Level5(BaseModel):
+                        class Level1Level2Level3Level4Level5Level6(BaseModel):
+                            value: str
+                        level6: Level1Level2Level3Level4Level5Level6
+                    level5: Level1Level2Level3Level4Level5
+                level4: Level1Level2Level3Level4
+            level3: Level1Level2Level3
+        level2: Level1Level2
+    class Union2Option0(BaseModel):
+        type: Literal["a"]
+        value: str
+    class Union2Option1(BaseModel):
+        type: Literal["b"]
+        count: float
+    class ArrayOfUnionsItemOption0(BaseModel):
+        kind: Literal["x"]
+        data: str
+    class ArrayOfUnionsItemOption1(BaseModel):
+        kind: Literal["y"]
+        flag: bool
+    class UnionOfArraysOption2Item(BaseModel):
+        id: str
+        value: float
+    class EmptyObject(BaseModel):
+        pass
+    class AllOptional(BaseModel):
+        class AllOptionalNested(BaseModel):
+            inner: Optional[str] = None
+        field1: Optional[str] = None
+        field2: Optional[float] = None
+        field3: Optional[bool] = None
+        nested: Optional[AllOptionalNested] = None
+    class NestedArraysItemItemItem(BaseModel):
+        value: str
+    class ComplexNested(BaseModel):
+        class ComplexNestedNested(BaseModel):
+            inner: Optional[Optional[str]] = None
+        required: str
+        optional: Optional[str] = None
+        nullable: Optional[str]
+        nullish: Optional[Optional[str]] = None
+        nested: Optional[Optional[ComplexNestedNested]] = None
+    class ArrayOfComplexItemOption0(BaseModel):
+        type: Literal["simple"]
+        value: str
+    class ArrayOfComplexItemOption1(BaseModel):
+        class ArrayOfComplexItemOption1Data(BaseModel):
+            nested: List[str]
+            metadata: Any
+        type: Literal["complex"]
+        data: ArrayOfComplexItemOption1Data
+    class DefaultObject(BaseModel):
+        key: str
+    class DefaultNested(BaseModel):
+        class DefaultNestedConfig(BaseModel):
+            enabled: bool = Field(default=True)
+        config: DefaultNestedConfig = Field(default_factory=dict)
+    level1: Level1
+    union1: Union[str, float]
+    union2: Union[Union2Option0, Union2Option1]
+    union3: Union[List[str], List[float], List[bool]]
+    arrayOfUnions: List[Union[ArrayOfUnionsItemOption0, ArrayOfUnionsItemOption1]]
+    unionOfArrays: Union[List[str], List[float], List[UnionOfArraysOption2Item]]
+    optionalNullable: Optional[Optional[str]] = None
+    nullableOptional: Optional[Optional[str]] = None
+    nullishOptional: Optional[Optional[str]] = None
+    optionalNullish: Optional[Optional[str]] = None
+    tripleOptional: Optional[Optional[str]] = None
+    emptyObject: EmptyObject
+    allOptional: AllOptional
+    thisIsAVeryLongFieldNameThatTestsHowWeHandleLongIdentifiersInGeneratedCode: str
+    anotherExtremelyLongFieldNameThatMightCauseIssuesWithCodeGenerationAndFormatting: float
+    stringConstraints: constr(min_length=1, max_length=1000, pattern=STRING_CONSTRAINTS_REGEX)
+    numberConstraints: conint(ge=0, le=100)
+    nestedArrays: List[List[List[NestedArraysItemItemItem]]]
+    complexNested: Optional[ComplexNested] = None
+    arrayOfComplex: List[Union[ArrayOfComplexItemOption0, ArrayOfComplexItemOption1]]
+    defaultArray: List[str] = Field(default_factory=list)
+    defaultObject: DefaultObject = Field(default_factory=dict)
+    defaultNested: Optional[DefaultNested] = None"
+`;
+
+exports[`Pydantic Code Generation Snapshots > generates consistent output for event schema 1`] = `
+"from pydantic import BaseModel, Field, confloat, conint, constr
+from typing import Any, List, Literal, Optional, Union
+from datetime import datetime
+from uuid import UUID
+
+VERSION_REGEX = r"^\\d+\\.\\d+\\.\\d+$"
+
+class EventSchema(BaseModel):
+    class PayloadOption0(BaseModel):
+        class PayloadOption0EventMetadata(BaseModel):
+            source: Literal["web", "api", "admin"]
+            ipAddress: Optional[str] = None
+        type: Literal["user_created"]
+        userId: UUID
+        email: str
+        timestamp: datetime
+        eventMetadata: Optional[PayloadOption0EventMetadata] = None
+    class PayloadOption1(BaseModel):
+        class PayloadOption1ItemsItem(BaseModel):
+            productId: UUID
+            quantity: conint(gt=0)
+            price: confloat(gt=0)
+        type: Literal["order_placed"]
+        orderId: UUID
+        userId: UUID
+        amount: confloat(gt=0)
+        currency: constr(min_length=3, max_length=3)
+        items: List[PayloadOption1ItemsItem]
+        timestamp: datetime
+    class PayloadOption2(BaseModel):
+        class PayloadOption2Error(BaseModel):
+            code: str
+            message: str
+        type: Literal["payment_processed"]
+        paymentId: UUID
+        orderId: UUID
+        amount: confloat(gt=0)
+        method: Literal["credit_card", "paypal", "bank_transfer"]
+        status: Literal["success", "failed", "pending"]
+        timestamp: datetime
+        error: Optional[PayloadOption2Error] = None
+    class PayloadOption3(BaseModel):
+        type: Literal["notification_sent"]
+        notificationId: UUID
+        userId: UUID
+        channel: Literal["email", "sms", "push", "in_app"]
+        template: str
+        data: Any
+        timestamp: datetime
+        delivered: bool = Field(default=False)
+    class Actor(BaseModel):
+        userId: Optional[UUID] = None
+        system: bool = Field(default=False)
+        ipAddress: Optional[str] = None
+        userAgent: Optional[str] = None
+    class Metadata(BaseModel):
+        correlationId: Optional[UUID] = None
+        causationId: Optional[UUID] = None
+        tags: List[str] = Field(default_factory=list)
+        environment: Optional[Literal["development", "staging", "production"]] = None
+    eventType: Literal["user_created", "order_placed", "payment_processed", "notification_sent"]
+    payload: Union[PayloadOption0, PayloadOption1, PayloadOption2, PayloadOption3]
+    id: UUID
+    timestamp: datetime
+    version: constr(pattern=VERSION_REGEX)
+    actor: Actor
+    metadata: Optional[Metadata] = None
+    relatedEvents: List[UUID] = Field(default_factory=list)"
+`;
+
+exports[`Pydantic Code Generation Snapshots > generates consistent output for simple schema 1`] = `
+"from pydantic import BaseModel, conint
+
+class SimpleSchema(BaseModel):
+    name: str
+    age: conint()"
+`;
+
+exports[`TypeScript Code Generation Snapshots > generates consistent output for API request schema 1`] = `
+"export interface Headers {
+  "Content-Type": string;
+  Authorization?: string;
+  "X-Request-ID"?: string;
+  "User-Agent"?: string;
+}
+
+export interface QueryFilters {
+  status?: "active" | "inactive" | "pending";
+  dateFrom?: string;
+  dateTo?: string;
+  minPrice?: number;
+  maxPrice?: number;
+}
+
+export interface QueryPagination {
+  page: number;
+  limit: number;
+  sortBy?: "created_at" | "updated_at" | "name";
+  sortOrder: "asc" | "desc";
+}
+
+export interface Query {
+  search?: string;
+  filters?: QueryFilters;
+  pagination?: QueryPagination;
+}
+
+export interface BodyOption0Data {
+  name: string;
+  email: string;
+  age?: number;
+}
+
+export interface BodyOption0 {
+  type: "create";
+  data: BodyOption0Data;
+}
+
+export interface BodyOption1Data {
+  name?: string;
+  email?: string;
+}
+
+export interface BodyOption1 {
+  type: "update";
+  id: string;
+  data: BodyOption1Data;
+}
+
+export interface BodyOption2 {
+  type: "delete";
+  id: string;
+  reason?: string;
+}
+
+export interface ResponseError {
+  code: string;
+  message: string;
+  details?: any;
+}
+
+export interface ResponseMetaPagination {
+  page: number;
+  limit: number;
+  sortBy?: "created_at" | "updated_at" | "name";
+  sortOrder: "asc" | "desc";
+}
+
+export interface ResponseMeta {
+  requestId: string;
+  timestamp: Date;
+  duration: number;
+  pagination?: ResponseMetaPagination;
+}
+
+export interface Response {
+  success: boolean;
+  data?: any;
+  error?: ResponseError;
+  meta?: ResponseMeta;
+}
+
+export interface ApiRequestSchema {
+  method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
+  path: string;
+  headers: Headers;
+  query?: Query;
+  body: BodyOption0 | BodyOption1 | BodyOption2;
+  response: Response;
+}"
+`;
+
+exports[`TypeScript Code Generation Snapshots > generates consistent output for comprehensive schema 1`] = `
+"export interface ItemsItem {
+  id: string;
+  value: number;
+}
+
+export interface AddressCoordinatesElevation {
+  meters: number;
+  source?: string;
+}
+
+export interface AddressCoordinates {
+  lat: number;
+  lng: number;
+  elevation: AddressCoordinatesElevation;
+}
+
+export interface Address {
+  street: string;
+  city: string;
+  country: string;
+  coordinates: AddressCoordinates;
+}
+
+export interface Metadata {
+  key: string;
+  value: string;
+}
+
+export interface Settings {
+  theme: "light" | "dark";
+  notifications: boolean;
+}
+
+export interface Config {}
+
+export interface PaymentOption0 {
+  method: "credit_card";
+  cardNumber: string;
+  expiry: string;
+}
+
+export interface PaymentOption1 {
+  method: "paypal";
+  email: string;
+}
+
+export interface PaymentOption2 {
+  method: "bank_transfer";
+  accountNumber: string;
+  routingNumber: string;
+}
+
+export interface ProfileSocial {
+  twitter?: string;
+  linkedin?: string;
+  github?: string;
+}
+
+export interface Profile {
+  bio?: string;
+  avatar: string | null;
+  social?: ProfileSocial;
+}
+
+export interface ComprehensiveSchema {
+  name: string;
+  email: string;
+  phone: string;
+  uuid: string;
+  datetime: string;
+  date: string;
+  age: number;
+  score: number;
+  rating: number;
+  price: number;
+  quantity: number;
+  isActive: boolean;
+  verified: boolean;
+  status: "pending" | "active" | "inactive" | "archived";
+  priority: "high";
+  type: "user" | "admin" | "guest";
+  tags: string[];
+  scores: number[];
+  items: ItemsItem[];
+  address: Address;
+  middleName?: string;
+  nickname: string | null;
+  alias?: string | null;
+  metadata?: Metadata;
+  settings: Settings;
+  preferences: string[];
+  config: Config;
+  payment: PaymentOption0 | PaymentOption1 | PaymentOption2;
+  extraData: any;
+  unknownField: unknown;
+  profile: Profile;
+}"
+`;
+
+exports[`TypeScript Code Generation Snapshots > generates consistent output for config schema 1`] = `
+"export interface ServerCors {
+  enabled: boolean;
+  origins: string[];
+}
+
+export interface Server {
+  host: string;
+  port: number;
+  cors: ServerCors;
+}
+
+export interface DatabasePool {
+  min: number;
+  max: number;
+  idleTimeout: number;
+}
+
+export interface Database {
+  host: string;
+  port: number;
+  database: string;
+  username: string;
+  password: string;
+  ssl: boolean;
+  pool: DatabasePool;
+}
+
+export interface CacheRedis {
+  host?: string;
+  port?: number;
+  password?: string;
+}
+
+export interface Cache {
+  enabled: boolean;
+  type: "memory" | "redis" | "memcached";
+  ttl: number;
+  redis?: CacheRedis;
+}
+
+export interface LoggingFile {
+  path: string;
+  maxSize: number;
+  maxFiles: number;
+}
+
+export interface Logging {
+  level: "debug" | "info" | "warn" | "error";
+  format: "json" | "text";
+  output: "console" | "file" | "both";
+  file?: LoggingFile;
+}
+
+export interface FeaturesRateLimiting {
+  enabled: boolean;
+  maxRequests: number;
+  windowMs: number;
+}
+
+export interface Features {
+  enableAuth: boolean;
+  enableMetrics: boolean;
+  enableTracing: boolean;
+  rateLimiting?: FeaturesRateLimiting;
+}
+
+export interface Secrets {
+  jwtSecret: string;
+  apiKey?: string;
+  encryptionKey?: string;
+}
+
+export interface Validation {
+  strictMode: boolean;
+  allowUnknownFields: boolean;
+  maxDepth: number;
+}
+
+export interface ConfigSchema {
+  env: "development" | "staging" | "production";
+  debug: boolean;
+  server: Server;
+  database: Database;
+  cache: Cache;
+  logging: Logging;
+  features: Features;
+  secrets?: Secrets;
+  validation: Validation;
+}"
+`;
+
+exports[`TypeScript Code Generation Snapshots > generates consistent output for database entity schema 1`] = `
+"export interface MetadataPreferences {
+  theme: "light" | "dark" | "auto";
+  language: string;
+  notifications: boolean;
+}
+
+export interface Metadata {
+  last_login: string | null;
+  login_count: number;
+  preferences: MetadataPreferences;
+}
+
+export interface Organization {
+  id: string;
+  name: string;
+  domain?: string;
+  created_at: Date;
+  updated_at: string;
+  deleted_at: string | null;
+}
+
+export interface RolesItem {
+  id: string;
+  name: string;
+  permissions: string[];
+  assigned_at: string;
+}
+
+export interface ProfileLocation {
+  city?: string;
+  country?: string;
+  timezone?: string;
+}
+
+export interface ProfileSocialLinks {
+  twitter?: string;
+  linkedin?: string;
+  github?: string;
+}
+
+export interface Profile {
+  bio: string | null;
+  avatar_url: string | null;
+  location?: ProfileLocation;
+  social_links?: ProfileSocialLinks;
+}
+
+export interface DatabaseEntitySchema {
+  id: string;
+  email: string;
+  username: string;
+  full_name: string;
+  status: "active" | "inactive" | "suspended" | "pending_verification";
+  organization_id: string | null;
+  team_id?: string;
+  created_at: Date;
+  updated_at: string;
+  deleted_at: string | null;
+  metadata?: Metadata;
+  organization?: Organization;
+  roles: RolesItem[];
+  profile?: Profile;
+}"
+`;
+
+exports[`TypeScript Code Generation Snapshots > generates consistent output for edge cases schema 1`] = `
+"export interface Level1Level2Level3Level4Level5Level6 {
+  value: string;
+}
+
+export interface Level1Level2Level3Level4Level5 {
+  level6: Level1Level2Level3Level4Level5Level6;
+}
+
+export interface Level1Level2Level3Level4 {
+  level5: Level1Level2Level3Level4Level5;
+}
+
+export interface Level1Level2Level3 {
+  level4: Level1Level2Level3Level4;
+}
+
+export interface Level1Level2 {
+  level3: Level1Level2Level3;
+}
+
+export interface Level1 {
+  level2: Level1Level2;
+}
+
+export interface Union2Option0 {
+  type: "a";
+  value: string;
+}
+
+export interface Union2Option1 {
+  type: "b";
+  count: number;
+}
+
+export interface ArrayOfUnionsItemOption0 {
+  kind: "x";
+  data: string;
+}
+
+export interface ArrayOfUnionsItemOption1 {
+  kind: "y";
+  flag: boolean;
+}
+
+export interface UnionOfArraysOption2Item {
+  id: string;
+  value: number;
+}
+
+export interface EmptyObject {}
+
+export interface AllOptionalNested {
+  inner?: string;
+}
+
+export interface AllOptional {
+  field1?: string;
+  field2?: number;
+  field3?: boolean;
+  nested?: AllOptionalNested;
+}
+
+export interface NestedArraysItemItemItem {
+  value: string;
+}
+
+export interface ComplexNestedNested {
+  inner?: string | null;
+}
+
+export interface ComplexNested {
+  required: string;
+  optional?: string;
+  nullable: string | null;
+  nullish?: string | null;
+  nested?: ComplexNestedNested | null;
+}
+
+export interface ArrayOfComplexItemOption0 {
+  type: "simple";
+  value: string;
+}
+
+export interface ArrayOfComplexItemOption1Data {
+  nested: string[];
+  metadata: any;
+}
+
+export interface ArrayOfComplexItemOption1 {
+  type: "complex";
+  data: ArrayOfComplexItemOption1Data;
+}
+
+export interface DefaultObject {
+  key: string;
+}
+
+export interface DefaultNestedConfig {
+  enabled: boolean;
+}
+
+export interface DefaultNested {
+  config: DefaultNestedConfig;
+}
+
+export interface EdgeCasesSchema {
+  level1: Level1;
+  union1: string | number;
+  union2: Union2Option0 | Union2Option1;
+  union3: string[] | number[] | boolean[];
+  arrayOfUnions: (ArrayOfUnionsItemOption0 | ArrayOfUnionsItemOption1)[];
+  unionOfArrays: string[] | number[] | UnionOfArraysOption2Item[];
+  optionalNullable?: string | null;
+  nullableOptional?: string | null;
+  nullishOptional?: string | null;
+  optionalNullish?: string | null;
+  tripleOptional?: string | null;
+  emptyObject: EmptyObject;
+  allOptional: AllOptional;
+  thisIsAVeryLongFieldNameThatTestsHowWeHandleLongIdentifiersInGeneratedCode: string;
+  anotherExtremelyLongFieldNameThatMightCauseIssuesWithCodeGenerationAndFormatting: number;
+  stringConstraints: string;
+  numberConstraints: number;
+  nestedArrays: NestedArraysItemItemItem[][][];
+  complexNested?: ComplexNested;
+  arrayOfComplex: (ArrayOfComplexItemOption0 | ArrayOfComplexItemOption1)[];
+  defaultArray: string[];
+  defaultObject: DefaultObject;
+  defaultNested?: DefaultNested;
+}"
+`;
+
+exports[`TypeScript Code Generation Snapshots > generates consistent output for event schema 1`] = `
+"export interface PayloadOption0EventMetadata {
+  source: "web" | "api" | "admin";
+  ipAddress?: string;
+}
+
+export interface PayloadOption0 {
+  type: "user_created";
+  userId: string;
+  email: string;
+  timestamp: string;
+  eventMetadata?: PayloadOption0EventMetadata;
+}
+
+export interface PayloadOption1ItemsItem {
+  productId: string;
+  quantity: number;
+  price: number;
+}
+
+export interface PayloadOption1 {
+  type: "order_placed";
+  orderId: string;
+  userId: string;
+  amount: number;
+  currency: string;
+  items: PayloadOption1ItemsItem[];
+  timestamp: string;
+}
+
+export interface PayloadOption2Error {
+  code: string;
+  message: string;
+}
+
+export interface PayloadOption2 {
+  type: "payment_processed";
+  paymentId: string;
+  orderId: string;
+  amount: number;
+  method: "credit_card" | "paypal" | "bank_transfer";
+  status: "success" | "failed" | "pending";
+  timestamp: string;
+  error?: PayloadOption2Error;
+}
+
+export interface PayloadOption3 {
+  type: "notification_sent";
+  notificationId: string;
+  userId: string;
+  channel: "email" | "sms" | "push" | "in_app";
+  template: string;
+  data: any;
+  timestamp: string;
+  delivered: boolean;
+}
+
+export interface Actor {
+  userId?: string;
+  system: boolean;
+  ipAddress?: string;
+  userAgent?: string;
+}
+
+export interface Metadata {
+  correlationId?: string;
+  causationId?: string;
+  tags: string[];
+  environment?: "development" | "staging" | "production";
+}
+
+export interface EventSchema {
+  eventType: "user_created" | "order_placed" | "payment_processed" | "notification_sent";
+  payload: PayloadOption0 | PayloadOption1 | PayloadOption2 | PayloadOption3;
+  id: string;
+  timestamp: string;
+  version: string;
+  actor: Actor;
+  metadata?: Metadata;
+  relatedEvents: string[];
+}"
+`;
+
+exports[`TypeScript Code Generation Snapshots > generates consistent output for simple schema 1`] = `
+"export interface SimpleSchema {
+  name: string;
+  age: number;
+}"
+`;
+
+exports[`TypeScript Generation with Export Name Overrides > generates consistent output with export name overrides 1`] = `
+"export interface ItemsItem {
+  id: string;
+  value: number;
+}
+
+export interface AddressCoordinatesElevation {
+  meters: number;
+  source?: string;
+}
+
+export interface AddressCoordinates {
+  lat: number;
+  lng: number;
+  elevation: AddressCoordinatesElevation;
+}
+
+export interface Address {
+  street: string;
+  city: string;
+  country: string;
+  coordinates: AddressCoordinates;
+}
+
+export interface Metadata {
+  key: string;
+  value: string;
+}
+
+export interface Settings {
+  theme: "light" | "dark";
+  notifications: boolean;
+}
+
+export interface Config {}
+
+export interface PaymentOption0 {
+  method: "credit_card";
+  cardNumber: string;
+  expiry: string;
+}
+
+export interface PaymentOption1 {
+  method: "paypal";
+  email: string;
+}
+
+export interface PaymentOption2 {
+  method: "bank_transfer";
+  accountNumber: string;
+  routingNumber: string;
+}
+
+export interface ProfileSocial {
+  twitter?: string;
+  linkedin?: string;
+  github?: string;
+}
+
+export interface Profile {
+  bio?: string;
+  avatar: string | null;
+  social?: ProfileSocial;
+}
+
+export interface RootSchema {
+  name: string;
+  email: string;
+  phone: string;
+  uuid: string;
+  datetime: string;
+  date: string;
+  age: number;
+  score: number;
+  rating: number;
+  price: number;
+  quantity: number;
+  isActive: boolean;
+  verified: boolean;
+  status: "pending" | "active" | "inactive" | "archived";
+  priority: "high";
+  type: "user" | "admin" | "guest";
+  tags: string[];
+  scores: number[];
+  items: ItemsItem[];
+  address: Address;
+  middleName?: string;
+  nickname: string | null;
+  alias?: string | null;
+  metadata?: Metadata;
+  settings: Settings;
+  preferences: string[];
+  config: Config;
+  payment: PaymentOption0 | PaymentOption1 | PaymentOption2;
+  extraData: any;
+  unknownField: unknown;
+  profile: Profile;
+}"
+`;

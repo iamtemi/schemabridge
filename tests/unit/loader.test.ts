@@ -1,15 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import { loadZodSchema, SchemaLoadError } from '../../src/core/loader/index.js';
-import { ZodType } from 'zod';
+import { ZodTypeAny } from 'zod';
 
 const fixturePath = './tests/fixtures/simple-schema.ts';
 const importedFixture = './tests/fixtures/imported/root.ts';
 
 describe('loadZodSchema', () => {
   it('loads a named export Zod schema', async () => {
-    const schema = await loadZodSchema({ file: fixturePath, exportName: 'userSchema' });
+    const { schema } = await loadZodSchema({ file: fixturePath, exportName: 'userSchema' });
     expect(schema).toBeTruthy();
-    expect((schema as ZodType).parse({ name: 'Jane', age: 30 })).toEqual({
+    expect((schema as ZodTypeAny).parse({ name: 'Jane', age: 30 })).toEqual({
       name: 'Jane',
       age: 30,
     });
@@ -28,7 +28,7 @@ describe('loadZodSchema', () => {
   });
 
   it('loads comprehensive schema', async () => {
-    const schema = await loadZodSchema({
+    const { schema } = await loadZodSchema({
       file: './tests/fixtures/comprehensive-schema.ts',
       exportName: 'comprehensiveSchema',
     });
@@ -36,7 +36,7 @@ describe('loadZodSchema', () => {
   });
 
   it('loads API request schema', async () => {
-    const schema = await loadZodSchema({
+    const { schema } = await loadZodSchema({
       file: './tests/fixtures/api-request-schema.ts',
       exportName: 'apiRequestSchema',
     });
@@ -44,7 +44,7 @@ describe('loadZodSchema', () => {
   });
 
   it('loads database entity schema', async () => {
-    const schema = await loadZodSchema({
+    const { schema } = await loadZodSchema({
       file: './tests/fixtures/database-entity-schema.ts',
       exportName: 'userEntitySchema',
     });
@@ -52,7 +52,7 @@ describe('loadZodSchema', () => {
   });
 
   it('loads config schema', async () => {
-    const schema = await loadZodSchema({
+    const { schema } = await loadZodSchema({
       file: './tests/fixtures/config-schema.ts',
       exportName: 'configSchema',
     });
@@ -60,7 +60,7 @@ describe('loadZodSchema', () => {
   });
 
   it('loads edge cases schema', async () => {
-    const schema = await loadZodSchema({
+    const { schema } = await loadZodSchema({
       file: './tests/fixtures/edge-cases-schema.ts',
       exportName: 'edgeCasesSchema',
     });
@@ -68,7 +68,7 @@ describe('loadZodSchema', () => {
   });
 
   it('loads event schema', async () => {
-    const schema = await loadZodSchema({
+    const { schema } = await loadZodSchema({
       file: './tests/fixtures/event-schema.ts',
       exportName: 'eventSchema',
     });
@@ -76,14 +76,16 @@ describe('loadZodSchema', () => {
   });
 
   it('resolves schemas that import other files when ts loader is registered', async () => {
-    const schema = await loadZodSchema({
+    const { schema, warnings, dependencies } = await loadZodSchema({
       file: importedFixture,
       exportName: 'importedSchema',
       registerTsLoader: true,
     });
     expect(schema).toBeTruthy();
+    expect(warnings.length).toBe(0);
+    expect(dependencies.length).toBeGreaterThan(1);
     expect(
-      (schema as ZodType).parse({
+      (schema as ZodTypeAny).parse({
         id: '123e4567-e89b-12d3-a456-426614174000',
         metadata: { source: 'api', tags: [] },
       }),

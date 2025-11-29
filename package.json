@@ -15,7 +15,9 @@
     }
   },
   "scripts": {
-    "build": "tsc --project tsconfig.build.json",
+    "build": "pnpm run build:lib && pnpm run build:cli",
+    "build:lib": "tsc --project tsconfig.build.json",
+    "build:cli": "esbuild src/cli/index.ts --bundle --format=esm --platform=node --target=node18 --outfile=bin/schemabridge.js --external:tsx/esm --external:zod --banner:js='#!/usr/bin/env node' --minify",
     "dev": "tsx src/cli/index.ts",
     "test": "vitest run",
     "test:unit": "vitest run tests/unit",
@@ -41,7 +43,7 @@
     "codegen",
     "type-generation"
   ],
-  "author": "",
+  "author": "temi",
   "license": "MIT",
   "dependencies": {
     "zod": "^4.1.13"
@@ -55,11 +57,12 @@
     "@typescript-eslint/eslint-plugin": "^8.48.0",
     "@typescript-eslint/parser": "^8.48.0",
     "@vitest/coverage-v8": "^2.1.9",
+    "esbuild": "^0.25.12",
     "eslint": "^9.39.1",
     "eslint-config-prettier": "^9.1.2",
     "globals": "^16.5.0",
     "husky": "^9.1.7",
-    "prettier": "^3.7.1",
+    "prettier": "^3.7.2",
     "tsx": "^4.20.6",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.48.0",

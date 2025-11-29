@@ -126,7 +126,8 @@ function renderProperty(
     true,
   );
   const optionalMarker = isOptional ? '?' : '';
-  return `${propertyName}${optionalMarker}: ${typeAnnotation};`;
+  const escapedName = escapeTypeScriptPropertyName(propertyName);
+  return `${escapedName}${optionalMarker}: ${typeAnnotation};`;
 }
 
 function buildTypeAnnotation(
@@ -335,6 +336,17 @@ function toPascalCase(value: string): string {
       .map((segment) => segment.charAt(0).toUpperCase() + segment.slice(1))
       .join('') || 'Model'
   );
+}
+
+function escapeTypeScriptPropertyName(name: string): string {
+  // Check if the name is a valid JavaScript identifier
+  // JavaScript identifiers must start with $, _, or Unicode letter, and contain only $, _, Unicode letters, and digits
+  // For simplicity, we check for common invalid characters
+  if (/^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(name)) {
+    return name;
+  }
+  // If not valid, quote it
+  return JSON.stringify(name);
 }
 
 function getNameForPath(
