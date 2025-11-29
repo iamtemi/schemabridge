@@ -8,7 +8,7 @@ name: Deploy Docs
 
 on:
   push:
-    branches: [main, dev]
+    branches: [main]
     paths:
       - 'docs/**'
       - '.vitepress/**'
