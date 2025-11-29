@@ -4,10 +4,13 @@
  * Main entry point for programmatic API usage.
  */
 
-import type { ZodTypeAny } from 'zod';
+import fs from 'node:fs/promises';
+import path from 'node:path';
+import type { ZodType } from 'zod';
 import { emitPydanticModel } from './core/emitters/pydantic.js';
 import { emitTypeScriptDefinitions } from './core/emitters/typescript.js';
 import { visitZodSchema } from './core/ast/zod-visitor.js';
+export { loadZodSchema, SchemaLoadError } from './core/loader/index.js';
 
 export type Target = 'pydantic' | 'typescript';
 
@@ -48,7 +51,7 @@ export interface SchemaConversionOptions {
  * - Pure function: no filesystem or process I/O.
  * - Does not write files or log to stdout.
  */
-export function convertZodToPydantic(schema: ZodTypeAny, options: SchemaConversionOptions): string {
+export function convertZodToPydantic(schema: ZodType, options: SchemaConversionOptions): string {
   const { node, warnings } = visitZodSchema(schema);
   if (node.type !== 'object') {
     throw new Error('Root schema must be a Zod object to generate Pydantic models.');
@@ -68,10 +71,7 @@ export function convertZodToPydantic(schema: ZodTypeAny, options: SchemaConversi
  * - Pure function: no filesystem or process I/O.
  * - Does not write files or log to stdout.
  */
-export function convertZodToTypescript(
-  schema: ZodTypeAny,
-  options: SchemaConversionOptions,
-): string {
+export function convertZodToTypescript(schema: ZodType, options: SchemaConversionOptions): string {
   const { node, warnings } = visitZodSchema(schema);
   if (node.type !== 'object') {
     throw new Error('Root schema must be a Zod object to generate TypeScript interfaces.');
@@ -95,7 +95,7 @@ export function convertZodToTypescript(
 }
 
 export interface GenerateFilesFromZodOptions extends SchemaConversionOptions {
-  schema: ZodTypeAny;
+  schema: ZodType;
   /**
    * Target language(s) to generate.
    * - "pydantic" → one `.py` file
@@ -129,8 +129,48 @@ export interface GeneratedFile {
  * - Returns metadata about the files that were written.
  */
 export function generateFilesFromZod(
-  _options: GenerateFilesFromZodOptions,
+  options: GenerateFilesFromZodOptions,
 ): Promise<GeneratedFile[]> {
-  // TODO: Implementation placeholder
-  return Promise.reject(new Error('Not implemented yet'));
+  const { schema, target, out, ...rest } = options;
+  const outputs: Array<{ target: Target; path: string }> = [];
+  const baseName = rest.name;
+
+  const resolvedOut = out ? path.resolve(out) : undefined;
+  const defaultExt = (t: Target) => (t === 'pydantic' ? '.py' : '.d.ts');
+
+  if (target === 'all') {
+    if (resolvedOut && path.extname(resolvedOut)) {
+      return Promise.reject(
+        new Error(
+          'When target is "all", --out must be a directory or omitted. Received a file path with extension.',
+        ),
+      );
+    }
+    const outDir = resolvedOut ?? process.cwd();
+    outputs.push(
+      { target: 'pydantic', path: path.join(outDir, `${baseName}${defaultExt('pydantic')}`) },
+      { target: 'typescript', path: path.join(outDir, `${baseName}${defaultExt('typescript')}`) },
+    );
+  } else {
+    if (!resolvedOut) {
+      outputs.push({ target, path: path.join(process.cwd(), `${baseName}${defaultExt(target)}`) });
+    } else if (path.extname(resolvedOut)) {
+      outputs.push({ target, path: resolvedOut });
+    } else {
+      outputs.push({ target, path: `${resolvedOut}${defaultExt(target)}` });
+    }
+  }
+
+  const writes = outputs.map(async (outSpec) => {
+    const content =
+      outSpec.target === 'pydantic'
+        ? convertZodToPydantic(schema, rest)
+        : convertZodToTypescript(schema, rest);
+
+    await fs.mkdir(path.dirname(outSpec.path), { recursive: true });
+    await fs.writeFile(outSpec.path, content, 'utf8');
+    return { path: outSpec.path, target: outSpec.target };
+  });
+
+  return Promise.all(writes);
 }

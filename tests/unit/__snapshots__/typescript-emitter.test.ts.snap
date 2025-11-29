@@ -1,21 +1,21 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
 exports[`Snapshot tests for complex schemas > matches snapshot for complex nested schema 1`] = `
-"export interface Settings {
+"export interface NormalizedMetadataSettings {
   theme: "light" | "dark";
   notifications: boolean;
 }
 
-export interface Metadata {
+export interface NormalizedMetadata {
   role: "admin" | "user" | "guest";
   permissions: string[];
-  settings?: Settings;
+  settings?: NormalizedMetadataSettings;
 }
 
 export interface Normalized {
   description: string;
   description_tokens: string[];
-  metadata: Metadata | null;
+  metadata: NormalizedMetadata | null;
 }
 
 export interface EnrichedTransactionSchema {

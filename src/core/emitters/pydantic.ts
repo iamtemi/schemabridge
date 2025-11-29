@@ -8,8 +8,10 @@ interface EmitContext {
   needsDatetime: boolean;
   regexConstants: Map<string, string>;
   regexOrder: string[];
-  emittedClassNames: Set<string>;
   warnings: VisitorWarning[];
+  renderedPaths: Set<string>;
+  pathNameMap: Map<string, string>;
+  nameCounts: Map<string, number>;
 }
 
 export interface EmitPydanticOptions {
@@ -30,8 +32,10 @@ export function emitPydanticModel(root: SchemaNode, options: EmitPydanticOptions
     needsDatetime: false,
     regexConstants: new Map(),
     regexOrder: [],
-    emittedClassNames: new Set(),
     warnings: options.warnings ?? [],
+    renderedPaths: new Set(),
+    pathNameMap: new Map(),
+    nameCounts: new Map(),
   };
 
   const classBlock = renderObject(root, options.name, ctx, []);
@@ -53,25 +57,19 @@ function renderObject(
     throw new Error(`Cannot render non-object node as class "${className}"`);
   }
 
-  // Check for class name collision
-  if (ctx.emittedClassNames.has(className)) {
-    throw new Error(
-      `Class name collision: "${className}" already emitted. Path: ${path.join('.')}. ` +
-        'This can happen when different field paths produce the same PascalCase name (e.g., "foo_bar" and "fooBar").',
-    );
-  }
-  ctx.emittedClassNames.add(className);
+  const resolvedName = getNameForPath(path.join('.') || className, className, ctx, path);
 
   const nestedBlocks: string[] = [];
-  const renderedPaths = new Set<string>();
   for (const [key, value] of Object.entries(node.fields)) {
     collectObjectNodes(value, [...path, key], (objNode, objPath) => {
       const pathKey = objPath.join('.');
-      if (renderedPaths.has(pathKey)) return;
-      renderedPaths.add(pathKey);
-      const nestedName = deriveClassName(
-        objPath,
+      if (ctx.renderedPaths.has(pathKey)) return;
+      ctx.renderedPaths.add(pathKey);
+      const nestedName = getNameForPath(
+        pathKey,
         objPath[objPath.length - 1] ?? 'Model',
+        ctx,
+        objPath,
         className,
       );
       nestedBlocks.push(renderObject(objNode, nestedName, ctx, objPath));
@@ -94,7 +92,7 @@ function renderObject(
     }
   }
 
-  return [`class ${className}(BaseModel):`, ...bodyLines].join('\n');
+  return [`class ${resolvedName}(BaseModel):`, ...bodyLines].join('\n');
 }
 
 function renderField(
@@ -245,7 +243,13 @@ function buildType(
     }
 
     case 'object': {
-      const className = deriveClassName(path, path[path.length - 1] ?? currentClass, currentClass);
+      const className = getNameForPath(
+        path.join('.'),
+        path[path.length - 1] ?? currentClass,
+        ctx,
+        path,
+        currentClass,
+      );
       return { annotation: className };
     }
 
@@ -475,23 +479,46 @@ function pythonRawString(value: string): string {
   return `r"${escaped}"`;
 }
 
-function deriveClassName(path: string[], fallback: string, currentClass: string): string {
-  let nameSource = path[path.length - 1] ?? fallback;
-
-  if (nameSource === '[item]' && path.length > 1) {
-    nameSource = path[path.length - 2] ?? fallback;
+function getNameForPath(
+  pathKey: string,
+  fallback: string,
+  ctx: EmitContext,
+  pathSegments: string[],
+  currentClass?: string,
+): string {
+  const existing = ctx.pathNameMap.get(pathKey);
+  if (existing) {
+    return existing;
   }
 
-  if (/^option\d+$/i.test(nameSource)) {
-    const parent = [...path]
-      .slice(0, -1)
-      .reverse()
-      .find((seg) => !/^option\d+$/i.test(seg) && seg !== '[item]');
-    const parentSegment = parent ?? currentClass ?? 'Option';
-    nameSource = `${parentSegment}_${nameSource}`;
+  const baseName = deriveNameFromPath(pathSegments, fallback, currentClass);
+  const count = ctx.nameCounts.get(baseName) ?? 0;
+  const uniqueName = count === 0 ? baseName : `${baseName}${count + 1}`;
+  ctx.nameCounts.set(baseName, count + 1);
+  ctx.pathNameMap.set(pathKey, uniqueName);
+  return uniqueName;
+}
+
+function deriveNameFromPath(
+  pathSegments: string[],
+  fallback: string,
+  currentClass?: string,
+): string {
+  const cleanedSegments = pathSegments
+    .filter(Boolean)
+    .map((seg) => {
+      if (seg === '[item]') return 'Item';
+      if (/^option\d+$/i.test(seg)) return seg;
+      return seg;
+    })
+    .filter((seg) => seg !== '');
+
+  if (cleanedSegments.length === 0) {
+    return toPascalCase(fallback || currentClass || 'Model');
   }
 
-  return toPascalCase(nameSource);
+  // Include parent chain to avoid collisions (e.g., body.option1.data vs body.option2.data)
+  return toPascalCase(cleanedSegments.join(' '));
 }
 
 function toPascalCase(value: string): string {

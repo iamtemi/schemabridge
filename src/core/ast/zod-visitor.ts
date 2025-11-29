@@ -5,7 +5,7 @@
  * Supports both Zod 3 and Zod 4 (using the `_def` and `_zod.def` shapes respectively).
  */
 
-import type { ZodTypeAny } from 'zod';
+import type { ZodType } from 'zod';
 
 export type SchemaNode =
   | { type: 'string'; constraints?: StringConstraints }
@@ -63,13 +63,13 @@ export interface VisitResult {
  * @param schema - Zod schema instance (Zod 3 or 4)
  * @param path - path within the schema, used for warnings context
  */
-export function visitZodSchema(schema: ZodTypeAny, path: string[] = []): VisitResult {
+export function visitZodSchema(schema: ZodType, path: string[] = []): VisitResult {
   const warnings: VisitorWarning[] = [];
   const node = walkSchema(schema, path, warnings);
   return { node, warnings };
 }
 
-function walkSchema(schema: ZodTypeAny, path: string[], warnings: VisitorWarning[]): SchemaNode {
+function walkSchema(schema: ZodType, path: string[], warnings: VisitorWarning[]): SchemaNode {
   const def = getSchemaDef(schema);
   if (!def || typeof def !== 'object') {
     throw new Error('Invalid Zod schema definition');
@@ -81,22 +81,22 @@ function walkSchema(schema: ZodTypeAny, path: string[], warnings: VisitorWarning
   switch (typeName) {
     case 'optional':
     case 'ZodOptional': {
-      const innerType = defObj.innerType as ZodTypeAny;
+      const innerType = defObj.innerType as ZodType;
       return { type: 'optional', inner: walkSchema(innerType, path, warnings) };
     }
     case 'nullable':
     case 'ZodNullable': {
-      const innerType = defObj.innerType as ZodTypeAny;
+      const innerType = defObj.innerType as ZodType;
       return { type: 'nullable', inner: walkSchema(innerType, path, warnings) };
     }
     case 'nullish':
     case 'ZodNullish': {
-      const innerType = defObj.innerType as ZodTypeAny;
+      const innerType = defObj.innerType as ZodType;
       return { type: 'nullish', inner: walkSchema(innerType, path, warnings) };
     }
     case 'default':
     case 'ZodDefault': {
-      const innerType = defObj.innerType as ZodTypeAny;
+      const innerType = defObj.innerType as ZodType;
       const defaultValue =
         typeof defObj.defaultValue === 'function'
           ? (defObj.defaultValue as () => unknown)()
@@ -117,7 +117,7 @@ function walkSchema(schema: ZodTypeAny, path: string[], warnings: VisitorWarning
         path,
         message: `Encountered Zod effect${effectType ? ` "${effectType}"` : ''}; using base schema shape.`,
       });
-      const inner = (defObj.schema as ZodTypeAny) ?? (defObj.innerType as ZodTypeAny);
+      const inner = (defObj.schema as ZodType) ?? (defObj.innerType as ZodType);
       return walkSchema(inner, path, warnings);
     }
 
@@ -127,7 +127,7 @@ function walkSchema(schema: ZodTypeAny, path: string[], warnings: VisitorWarning
         path,
         message: 'Encountered Zod pipeline; using input schema shape.',
       });
-      const inner = (defObj.in as ZodTypeAny) ?? (defObj.schema as ZodTypeAny);
+      const inner = (defObj.in as ZodType) ?? (defObj.schema as ZodType);
       return walkSchema(inner, path, warnings);
     }
   }
@@ -193,9 +193,7 @@ function walkSchema(schema: ZodTypeAny, path: string[], warnings: VisitorWarning
 
     case 'object':
     case 'ZodObject': {
-      const shapeGetter = defObj.shape as
-        | (() => Record<string, ZodTypeAny>)
-        | Record<string, ZodTypeAny>;
+      const shapeGetter = defObj.shape as (() => Record<string, ZodType>) | Record<string, ZodType>;
       const shape = typeof shapeGetter === 'function' ? shapeGetter() : shapeGetter;
       const fields: Record<string, SchemaNode> = {};
       for (const [key, value] of Object.entries(shape)) {
@@ -207,10 +205,10 @@ function walkSchema(schema: ZodTypeAny, path: string[], warnings: VisitorWarning
     case 'array':
     case 'ZodArray': {
       const elementType =
-        (defObj.element as ZodTypeAny) ??
-        (defObj.type !== 'array' ? (defObj.type as ZodTypeAny) : undefined) ??
-        (defObj.elementType as ZodTypeAny) ??
-        (defObj.items as ZodTypeAny);
+        (defObj.element as ZodType) ??
+        (defObj.type !== 'array' ? (defObj.type as ZodType) : undefined) ??
+        (defObj.elementType as ZodType) ??
+        (defObj.items as ZodType);
       if (!elementType) {
         throw new Error('Array schema missing element type');
       }
@@ -219,7 +217,7 @@ function walkSchema(schema: ZodTypeAny, path: string[], warnings: VisitorWarning
 
     case 'union':
     case 'ZodUnion': {
-      const options = (defObj.options as ZodTypeAny[]) || [];
+      const options = (defObj.options as ZodType[]) || [];
       return {
         type: 'union',
         options: options.map((opt, idx) => walkSchema(opt, [...path, `option${idx}`], warnings)),
@@ -228,8 +226,7 @@ function walkSchema(schema: ZodTypeAny, path: string[], warnings: VisitorWarning
 
     case 'ZodDiscriminatedUnion': {
       const optionsMap =
-        (defObj.options as Map<string, ZodTypeAny>) ??
-        (defObj.optionsMap as Map<string, ZodTypeAny>);
+        (defObj.options as Map<string, ZodType>) ?? (defObj.optionsMap as Map<string, ZodType>);
       const options = optionsMap ? Array.from(optionsMap.values()) : [];
       return {
         type: 'union',
@@ -256,11 +253,11 @@ function walkSchema(schema: ZodTypeAny, path: string[], warnings: VisitorWarning
   }
 }
 
-function isZod4(schema: ZodTypeAny): schema is ZodTypeAny & { _zod: { def: unknown } } {
+function isZod4(schema: ZodType): schema is ZodType & { _zod: { def: unknown } } {
   return typeof schema === 'object' && schema !== null && '_zod' in schema;
 }
 
-function getSchemaDef(schema: ZodTypeAny): unknown {
+function getSchemaDef(schema: ZodType): unknown {
   if (isZod4(schema)) {
     return (schema as { _zod: { def: unknown } })._zod.def;
   }

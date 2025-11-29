@@ -121,9 +121,7 @@ describe('emitPydanticModel', () => {
     expect(code).toContain('other: Union[OtherOption0, OtherOption1]');
   });
 
-  it('throws error on class name collision', () => {
-    // Create a schema where two different paths produce the same PascalCase name
-    // "foo_bar" and "fooBar" both become "FooBar"
+  it('disambiguates colliding paths by using full path naming', () => {
     const schema = z.object({
       foo_bar: z.object({
         value: z.string(),
@@ -133,12 +131,9 @@ describe('emitPydanticModel', () => {
       }),
     });
 
-    expect(() => {
-      convertZodToPydantic(schema, { name: 'CollisionTest' });
-    }).toThrow(
-      'Class name collision: "FooBar" already emitted. Path: fooBar. ' +
-        'This can happen when different field paths produce the same PascalCase name (e.g., "foo_bar" and "fooBar").',
-    );
+    const code = convertZodToPydantic(schema, { name: 'CollisionTest' }).trim();
+    expect(code).toContain('class FooBar(BaseModel):');
+    expect(code).toContain('class FooBar2(BaseModel):');
   });
 
   it('generates warning for unmapped regex flags', () => {

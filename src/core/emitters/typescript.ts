@@ -7,10 +7,11 @@
 import type { SchemaNode, VisitorWarning } from '../ast/index.js';
 
 interface EmitContext {
-  emittedTypeNames: Set<string>;
   renderedPaths: Set<string>; // Track which paths have been rendered to prevent duplicates
   warnings: VisitorWarning[];
   exportNameOverrides: Map<string, string>;
+  pathNameMap: Map<string, string>;
+  nameCounts: Map<string, number>;
 }
 
 export interface EmitTypeScriptOptions {
@@ -28,10 +29,11 @@ export function emitTypeScriptDefinitions(
   options: EmitTypeScriptOptions,
 ): string {
   const ctx: EmitContext = {
-    emittedTypeNames: new Set(),
     renderedPaths: new Set(),
     warnings: options.warnings ?? [],
     exportNameOverrides: new Map(Object.entries(options.exportNameOverrides ?? {})),
+    pathNameMap: new Map(),
+    nameCounts: new Map(),
   };
 
   if (root.type !== 'object') {
@@ -53,14 +55,7 @@ function renderInterface(
     throw new Error(`Cannot render non-object node as interface "${interfaceName}"`);
   }
 
-  // Check for name collision
-  if (ctx.emittedTypeNames.has(interfaceName)) {
-    throw new Error(
-      `Type name collision: "${interfaceName}" already emitted. Path: ${path.join('.')}. ` +
-        'This can happen when different field paths produce the same PascalCase name (e.g., "foo_bar" and "fooBar").',
-    );
-  }
-  ctx.emittedTypeNames.add(interfaceName);
+  const resolvedName = getNameForPath(path.join('.') || interfaceName, interfaceName, ctx, path);
 
   // Collect nested object interfaces
   // Strategy: Collect nested objects that are NOT direct children
@@ -75,7 +70,7 @@ function renderInterface(
       const pathKey = childPath.join('.');
       if (!ctx.renderedPaths.has(pathKey)) {
         ctx.renderedPaths.add(pathKey);
-        const childName = deriveInterfaceName(childPath, ctx, key, interfaceName);
+        const childName = getNameForPath(childPath.join('.'), key, ctx, childPath, resolvedName);
         nestedInterfaces.push(renderInterface(inner, childName, ctx, childPath));
       }
     } else {
@@ -84,11 +79,12 @@ function renderInterface(
         if (ctx.renderedPaths.has(pathKey)) return;
         ctx.renderedPaths.add(pathKey);
 
-        const nestedName = deriveInterfaceName(
-          objPath,
-          ctx,
+        const nestedName = getNameForPath(
+          pathKey,
           objPath[objPath.length - 1] ?? 'Model',
-          interfaceName,
+          ctx,
+          objPath,
+          resolvedName,
         );
         nestedInterfaces.push(renderInterface(objNode, nestedName, ctx, objPath));
       });
@@ -98,7 +94,7 @@ function renderInterface(
   // Render fields
   const fieldLines: string[] = [];
   for (const [key, value] of Object.entries(node.fields)) {
-    fieldLines.push(renderProperty(key, value, ctx, [...path, key], interfaceName));
+    fieldLines.push(renderProperty(key, value, ctx, [...path, key], resolvedName));
   }
 
   const indent = (line: string) => (line.length === 0 ? '' : `  ${line}`);
@@ -108,7 +104,7 @@ function renderInterface(
   }
 
   const interfaceBody = bodyLines.length > 0 ? ` {\n${bodyLines.join('\n')}\n}` : ' {}';
-  const interfaceDef = `export interface ${interfaceName}${interfaceBody}`;
+  const interfaceDef = `export interface ${resolvedName}${interfaceBody}`;
 
   // Combine nested interfaces and main interface
   const allInterfaces = [...nestedInterfaces, interfaceDef];
@@ -240,7 +236,13 @@ function buildBaseType(
       const overrideName = ctx.exportNameOverrides.get(overrideKey);
       const interfaceName =
         overrideName ??
-        deriveInterfaceName(path, ctx, path[path.length - 1] ?? currentInterface, currentInterface);
+        getNameForPath(
+          path.join('.'),
+          path[path.length - 1] ?? currentInterface,
+          ctx,
+          path,
+          currentInterface,
+        );
       return interfaceName;
     }
 
@@ -335,32 +337,50 @@ function toPascalCase(value: string): string {
   );
 }
 
-function deriveInterfaceName(
-  path: string[],
-  ctx: EmitContext,
+function getNameForPath(
+  pathKey: string,
   fallback: string,
-  currentInterface: string,
+  ctx: EmitContext,
+  pathSegments: string[],
+  currentInterface?: string,
 ): string {
-  const overrideKey = path.join('.');
-  const overrideName = ctx.exportNameOverrides.get(overrideKey);
-  if (overrideName) return overrideName;
-
-  let nameSource = path[path.length - 1] ?? fallback;
-
-  if (nameSource === '[item]' && path.length > 1) {
-    nameSource = path[path.length - 2] ?? fallback;
+  const override = ctx.exportNameOverrides.get(pathKey);
+  if (override) {
+    ctx.pathNameMap.set(pathKey, override);
+    return override;
+  }
+  const existing = ctx.pathNameMap.get(pathKey);
+  if (existing) {
+    return existing;
   }
 
-  if (/^option\d+$/i.test(nameSource)) {
-    const parent = [...path]
-      .slice(0, -1)
-      .reverse()
-      .find((seg) => !/^option\d+$/i.test(seg) && seg !== '[item]');
-    const parentSegment = parent ?? currentInterface ?? 'Option';
-    nameSource = `${parentSegment}_${nameSource}`;
+  const baseName = deriveNameFromPath(pathSegments, fallback, currentInterface);
+  const count = ctx.nameCounts.get(baseName) ?? 0;
+  const uniqueName = count === 0 ? baseName : `${baseName}${count + 1}`;
+  ctx.nameCounts.set(baseName, count + 1);
+  ctx.pathNameMap.set(pathKey, uniqueName);
+  return uniqueName;
+}
+
+function deriveNameFromPath(
+  pathSegments: string[],
+  fallback: string,
+  currentInterface?: string,
+): string {
+  const cleanedSegments = pathSegments
+    .filter(Boolean)
+    .map((seg) => {
+      if (seg === '[item]') return 'Item';
+      if (/^option\d+$/i.test(seg)) return seg;
+      return seg;
+    })
+    .filter((seg) => seg !== '');
+
+  if (cleanedSegments.length === 0) {
+    return toPascalCase(fallback || currentInterface || 'Model');
   }
 
-  return toPascalCase(nameSource);
+  return toPascalCase(cleanedSegments.join(' '));
 }
 
 function collectObjectNodes(

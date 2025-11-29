@@ -41,13 +41,13 @@ describe('emitTypeScriptDefinitions', () => {
 
     expect(code).toBe(
       [
-        'export interface Profile {',
+        'export interface UserProfile {',
         '  bio: string;',
         '}',
         '',
         'export interface User {',
         '  name: string;',
-        '  profile: Profile;',
+        '  profile: UserProfile;',
         '}',
         '',
         'export interface Root {',
@@ -94,14 +94,14 @@ describe('emitTypeScriptDefinitions', () => {
 
     expect(code).toBe(
       [
-        'export interface Nested {',
+        'export interface NestedItem {',
         '  value: string;',
         '}',
         '',
         'export interface ArrayTest {',
         '  tags: string[];',
         '  numbers: number[];',
-        '  nested: Nested[];',
+        '  nested: NestedItem[];',
         '}',
       ].join('\n'),
     );
@@ -211,7 +211,7 @@ describe('emitTypeScriptDefinitions', () => {
 
     expect(code).toBe(
       [
-        'export interface Metadata {',
+        'export interface UserMetadata {',
         '  role: "admin" | "user";',
         '  permissions: string[];',
         '}',
@@ -220,7 +220,7 @@ describe('emitTypeScriptDefinitions', () => {
         '  id: string;',
         '  name: string;',
         '  tags: string[];',
-        '  metadata?: Metadata;',
+        '  metadata?: UserMetadata;',
         '}',
         '',
         'export interface ComplexTest {',
@@ -356,7 +356,7 @@ describe('emitTypeScriptDefinitions', () => {
     );
   });
 
-  it('throws error on type name collision', () => {
+  it('disambiguates type name collisions using path-based names', () => {
     // Create a schema where two different paths produce the same PascalCase name
     const schema = z.object({
       foo_bar: z.object({
@@ -367,12 +367,9 @@ describe('emitTypeScriptDefinitions', () => {
       }),
     });
 
-    expect(() => {
-      convertZodToTypescript(schema, { name: 'CollisionTest' });
-    }).toThrow(
-      'Type name collision: "FooBar" already emitted. Path: fooBar. ' +
-        'This can happen when different field paths produce the same PascalCase name (e.g., "foo_bar" and "fooBar").',
-    );
+    const code = convertZodToTypescript(schema, { name: 'CollisionTest' });
+    expect(code).toContain('export interface FooBar');
+    expect(code).toContain('export interface FooBar2');
   });
 
   it('handles nested optionality correctly', () => {
