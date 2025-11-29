@@ -11,13 +11,9 @@ on:
         type: string
 
 jobs:
-  publish-npm:
-    name: Publish to npm
+  build:
+    name: Build Packages
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      id-token: write # Required for npm provenance
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -32,7 +28,6 @@ jobs:
         with:
           node-version: '22.x'
           cache: 'pnpm'
-          registry-url: 'https://registry.npmjs.org'
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -40,47 +35,7 @@ jobs:
       - name: Run tests
         run: pnpm run ci
 
-      - name: Build
-        run: pnpm build
-
-      - name: Publish to npm
-        run: npm publish --provenance --access public
-        # Uses npm Trusted Publishing (OIDC) - no token needed!
-        # Works automatically with GitHub Actions when:
-        # - id-token: write permission is set (already configured above)
-        # - setup-node@v4 with registry-url is used (already configured above)
-        # - --provenance flag is used (already set above)
-        # - Package exists on npm (published manually for first version)
-
-  publish-pypi:
-    name: Publish to PyPI
-    runs-on: ubuntu-latest
-    environment:
-      name: pypi
-      url: https://pypi.org/project/schemabridge/
-    permissions:
-      contents: read
-      id-token: write # Required for PyPI trusted publishing
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Install pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 10
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '22.x'
-          cache: 'pnpm'
-
-      - name: Install Node dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Build project
+      - name: Build Node.js project
         run: pnpm build
 
       - name: Setup Python
@@ -88,15 +43,79 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Install build dependencies
-        run: pip install build twine
+      - name: Install Python build dependencies
+        run: pip install build
 
       - name: Build Python package
         working-directory: ./python
         run: python -m build
 
+      - name: Upload npm package artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: npm-package
+          path: |
+            dist/
+            package.json
+            README.md
+            LICENSE
+
+      - name: Upload Python package artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: python-package
+          path: python/dist/
+
+  publish-npm:
+    name: Publish to npm
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: npm
+      url: https://www.npmjs.com/package/schemabridge
+    permissions:
+      contents: read
+      id-token: write # Required for npm provenance
+    steps:
+      - name: Download npm package artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: npm-package
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.x'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Publish to npm
+        run: npm publish --provenance --access public
+        # IMPORTANT: This uses npm Trusted Publishing (OIDC).
+        # For this to work, you MUST:
+        # 1. Create the package on npmjs.com first.
+        # 2. In your npm package settings, under "Trusted Publishers", add this repository.
+        # This will grant the workflow permission to publish new versions.
+        # The E404 error you saw likely means the package doesn't exist or isn't configured for trusted publishing.
+
+  publish-pypi:
+    name: Publish to PyPI
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/project/schemabridge/
+    permissions:
+      id-token: write # Required for PyPI trusted publishing
+    steps:
+      - name: Download Python package artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: python-package
+          path: dist/
+
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
-        # Uses PyPI Trusted Publishing (OIDC) - no token needed!
-        # Requires trusted publishing to be set up at:
-        # https://pypi.org/manage/account/publishing/
+        # IMPORTANT: This uses PyPI Trusted Publishing (OIDC).
+        # For this to work, you MUST configure this repository as a "Trusted Publisher"
+        # in your PyPI project settings.
+        # https://pypi.org/manage/project/schemabridge/settings/publishing/

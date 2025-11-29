@@ -1,3 +1,9 @@
+# IMPORTANT:
+# To make this workflow work, you must go to your repository's settings,
+# navigate to the "Pages" section, and set the "Build and deployment"
+# source to "GitHub Actions". This will allow the workflow to deploy your
+# built documentation site.
+
 name: Deploy Docs
 
 on:
@@ -16,7 +22,7 @@ permissions:
 
 concurrency:
   group: pages
-  cancel-in-progress: false
+  cancel-in-progress: true # Cancel old runs when a new commit is pushed
 
 jobs:
   build-and-deploy:
@@ -46,9 +52,6 @@ jobs:
 
       - name: Build docs
         run: pnpm docs:build
-
-      - name: Setup Pages
-        uses: actions/configure-pages@v4
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
