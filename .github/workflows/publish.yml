@@ -1,4 +1,8 @@
 name: Publish
+run-name: >-
+  ${{ github.event_name == 'workflow_dispatch'
+      ? (github.event.inputs.run_name != '' ? format('Publish: {0}', github.event.inputs.run_name) : 'Publish (manual)')
+      : 'Publish' }}
 
 on:
   release:
@@ -24,6 +28,10 @@ on:
         required: false
         type: boolean
         default: true
+      run_name:
+        description: 'Label for this manual run (optional)'
+        required: false
+        type: string
 
 jobs:
   build:
@@ -110,13 +118,21 @@ jobs:
           node-version: '22.x'
           registry-url: 'https://registry.npmjs.org'
 
+      - name: Get npm provenance token
+        id: npm_provenance
+        uses: npm/actions/npm-auth@v1
+        with:
+          registry: https://registry.npmjs.org
+
       - name: Publish to npm (dry run)
         if: github.event_name == 'workflow_dispatch' && github.event.inputs.dry_run == 'true'
         run: npm publish --dry-run --access public --ignore-scripts
 
       - name: Publish to npm
         if: github.event_name != 'workflow_dispatch' || github.event.inputs.dry_run != 'true'
-        run: npm publish --access public --ignore-scripts
+        run: npm publish --access public --provenance --ignore-scripts
+        env:
+          NODE_AUTH_TOKEN: ${{ steps.npm_provenance.outputs.token }}
         # IMPORTANT: This uses npm Trusted Publishing (OIDC).
         # --ignore-scripts is used because we've already built everything in the build job.
 
