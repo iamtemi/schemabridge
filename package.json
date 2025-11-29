@@ -15,11 +15,15 @@
     }
   },
   "scripts": {
-    "build": "pnpm run build:lib && pnpm run build:cli",
+    "build": "pnpm run build:lib && pnpm run build:cli && pnpm run build:python",
     "build:lib": "tsc --project tsconfig.build.json",
     "build:cli": "esbuild src/cli/index.ts --bundle --format=esm --platform=node --target=node18 --outfile=bin/schemabridge.js --external:tsx/esm --external:zod --banner:js='#!/usr/bin/env node' --minify",
+    "build:python": "mkdir -p python/schemabridge/bin && cp bin/schemabridge.js python/schemabridge/bin/schemabridge.js",
     "dev": "tsx src/cli/index.ts",
-    "test": "vitest run",
+    "docs:dev": "vitepress dev docs",
+    "docs:build": "vitepress build docs",
+    "docs:preview": "vitepress preview docs",
+    "test": "pkill -f vitest || true && vitest run",
     "test:unit": "vitest run tests/unit",
     "test:integration": "vitest run tests/integration",
     "test:watch": "vitest watch",
@@ -46,6 +50,8 @@
   "author": "temi",
   "license": "MIT",
   "dependencies": {
+    "tsx": "^4.20.6",
+    "vitepress-plugin-group-icons": "^1.6.5",
     "zod": "^4.1.13"
   },
   "peerDependencies": {
@@ -63,9 +69,9 @@
     "globals": "^16.5.0",
     "husky": "^9.1.7",
     "prettier": "^3.7.2",
-    "tsx": "^4.20.6",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.48.0",
+    "vitepress": "^1.6.4",
     "vitest": "^2.1.9"
   },
   "engines": {

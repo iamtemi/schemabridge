@@ -1,0 +1,125 @@
+# Folder Conversion
+
+Convert all your Zod schemas at once. One command walks a folder, finds exported schemas, and writes a file per export.
+
+## How It Works
+
+```bash
+schemabridge convert folder ./src/schemas --out ./generated --to pydantic
+```
+
+SchemaBridge scans every file in `./src/schemas`, finds exported Zod schemas, and converts them to Python:
+
+```
+src/schemas/
+├── user.ts           → generated/user.py
+├── product.ts        → generated/product.py
+└── common/
+    └── types.ts      → generated/common/types.py
+```
+
+Your folder structure stays intact. Each exported schema becomes its own file (snake_case).
+
+## Multiple Schemas Per File
+
+If one TypeScript file exports multiple schemas, each gets converted:
+
+**Input:**
+
+```typescript
+export const userSchema = z.object({ ... });
+export const adminSchema = z.object({ ... });
+```
+
+**Output:**
+
+```
+generated/
+├── user_schema.py
+└── admin_schema.py
+```
+
+The file names come from the export names, converted to snake_case.
+
+## Flat Output
+
+Want all files in one folder? Use `--flat`:
+
+```bash
+schemabridge convert folder ./src/schemas --out ./generated --flat
+```
+
+```
+generated/
+├── user.py
+├── product.py
+└── types.py
+```
+
+No subfolders, everything at the top level.
+
+## Python Package Mode
+
+Add `--init` to create `__init__.py` files for proper Python imports:
+
+```bash
+schemabridge convert folder ./src/schemas --out ./generated --init
+```
+
+```
+generated/
+├── __init__.py
+├── user.py
+└── common/
+    ├── __init__.py
+    └── types.py
+```
+
+Now you can import like this:
+
+```python
+from generated.user import UserSchema
+from generated.common.types import TypesSchema
+```
+
+## Build Integration
+
+Add folder conversion to your build process:
+
+```typescript
+// scripts/generate.ts
+import { convertFolder } from 'schemabridge';
+
+await convertFolder({
+  sourceDir: './src/schemas',
+  outDir: './python/models',
+  target: 'pydantic',
+  preserveStructure: true,
+  generateInitFiles: true,
+});
+```
+
+```json
+{
+  "scripts": {
+    "generate": "tsx scripts/generate.ts"
+  }
+}
+```
+
+Run `npm run generate` and your Python models update automatically.
+
+::: warning Circular Dependencies
+Schemas that reference each other in a circle can cause problems. Keep your schema dependencies flowing one direction.
+:::
+
+## What gets converted
+
+- All exported Zod schemas in files under `sourceDir`.
+- Referenced schemas are inlined inside their parents; separate files are only created for exports.
+- Enums (`z.enum([...])`) become `Literal[...]` in Python and union types in `.d.ts`.
+
+## Zod v4 tips
+
+- Use direct helpers: `z.date()`, `z.coerce.date()`, `z.string().uuid()`, `z.string().email()`.
+- Avoid deprecated patterns like `z.string().datetime()` unless you truly want string output; otherwise consider `z.date()`/`z.coerce.date()`.\*\*\*

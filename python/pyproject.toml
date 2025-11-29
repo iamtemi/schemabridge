@@ -41,7 +41,7 @@ schemabridge = "schemabridge.cli:main"
 
 [project.urls]
 Homepage = "https://github.com/iamtemi/schemabridge"
-Documentation = "https://github.com/iamtemi/schemabridge#readme"
+Documentation = "https://iamtemi.github.io/schemabridge/"
 Repository = "https://github.com/iamtemi/schemabridge"
 Issues = "https://github.com/iamtemi/schemabridge/issues"
 
@@ -50,7 +50,7 @@ packages = ["schemabridge"]
 package-dir = {"" = "."}
 
 [tool.setuptools.package-data]
-schemabridge = ["py.typed"]
+schemabridge = ["py.typed", "bin/schemabridge.js"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

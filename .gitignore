@@ -64,3 +64,14 @@ MANIFEST
 # Custom
 internal-docs/
 internal-docs/*
+!internal-docs/PUBLISHING.md
+
+# VitePress
+docs/.vitepress/cache/
+docs/.vitepress/dist/
+
+# Ignore generated example outputs
+examples/pydantic/
+examples/pydantic_flat/
+examples/pydantic_flat_init/
+examples/pydantic_init/

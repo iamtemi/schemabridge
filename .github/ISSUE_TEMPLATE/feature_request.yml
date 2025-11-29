@@ -1,0 +1,37 @@
+name: 'Feature request'
+description: 'Suggest an idea or improvement for SchemaBridge'
+labels: ['enhancement']
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for suggesting an improvement. Please describe the problem and your idea clearly.
+  - type: input
+    id: summary
+    attributes:
+      label: 'Summary'
+      description: 'Short description of the feature'
+      placeholder: 'Add support for JSON Schema output'
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: 'Problem this solves'
+      description: 'What problem or use case is this feature trying to address?'
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: 'Proposed solution'
+      description: 'How you imagine this working (CLI flags, API shape, etc.)'
+    validations:
+      required: false
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: "Alternatives you've considered"
+      description: "Other ways you've tried to solve this"
+    validations:
+      required: false

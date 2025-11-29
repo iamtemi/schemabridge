@@ -11,6 +11,16 @@ import { emitPydanticModel } from './core/emitters/pydantic.js';
 import { emitTypeScriptDefinitions } from './core/emitters/typescript.js';
 import { visitZodSchema } from './core/ast/zod-visitor.js';
 export { loadZodSchema, SchemaLoadError } from './core/loader/index.js';
+export {
+  scanFolderForSchemas,
+  type SchemaExport,
+  type ScanFolderOptions,
+} from './core/loader/folder-scanner.js';
+export {
+  convertFolder,
+  type ConvertFolderOptions,
+  type ConvertFolderResult,
+} from './core/loader/folder-converter.js';
 
 export type Target = 'pydantic' | 'typescript';
 
