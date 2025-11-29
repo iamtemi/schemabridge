@@ -1,6 +1,6 @@
 {
   "name": "schemabridge",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Cross-language schema converter: Zod to Pydantic and TypeScript",
   "type": "module",
   "main": "./dist/index.js",
