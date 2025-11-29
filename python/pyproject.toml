@@ -10,7 +10,7 @@ readme = "README.md"
 requires-python = ">=3.9"
 license = {text = "MIT"}
 authors = [
-    {name = "Your Name", email = "a.adenuga@hotmail.com"}
+    {name = "Temi", email = "a.adenuga@hotmail.com"}
 ]
 keywords = ["zod", "pydantic", "typescript", "schema", "converter", "codegen"]
 classifiers = [
