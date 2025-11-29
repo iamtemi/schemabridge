@@ -2,18 +2,55 @@
 
 This document explains how to publish SchemaBridge to npm, PyPI, and deploy documentation.
 
+## Quick production checklist
+
+- [ ] Working tree clean; `pnpm test` green
+- [ ] `pnpm build` creates `bin/schemabridge.js` and copies it to `python/schemabridge/bin/schemabridge.js`
+- [ ] Versions bumped and aligned in `package.json` **and** `python/pyproject.toml`; `CHANGELOG.md` updated
+- [ ] `npm pack --dry-run` shows bundled CLI and python assets are included
+- [ ] `cd python && python -m build` succeeds; `twine check dist/*` passes
+- [ ] Tag and GitHub Release created; `publish.yml` run finishes successfully
+
 ## Prerequisites
 
 ### npm Publishing
 
 1. **npm account**: Create an account at [npmjs.com](https://www.npmjs.com)
-2. **npm token**: Generate an access token:
-   - Go to https://www.npmjs.com/settings/YOUR_USERNAME/tokens
-   - Create a new "Automation" token
-   - Add it as a GitHub secret named `NPM_TOKEN`:
-     - Go to your repo → Settings → Secrets and variables → Actions
-     - Click "New repository secret"
-     - Name: `NPM_TOKEN`, Value: your token
+
+2. **First-time setup** (one-time, for initial publish):
+
+   **Option A: Manual first publish** (simplest):
+
+   ```bash
+   # Login to npm locally
+   npm login
+
+   # Publish the first version manually
+   npm publish --access public
+   ```
+
+   After the first publish, the GitHub Actions workflow will use Trusted Publishing automatically.
+
+   **Option B: Use temporary token for first publish**:
+   - Create a granular access token at https://www.npmjs.com/settings/YOUR_USERNAME/tokens
+   - Add it as GitHub secret `NPM_TOKEN` (temporary, only for first publish)
+   - The workflow will use it once, then you can remove it
+   - After first publish, the workflow automatically switches to Trusted Publishing
+
+3. **Trusted Publishing (OIDC)** - **Automatic after first publish**:
+   - No configuration needed! The workflow automatically uses OIDC when:
+     - `id-token: write` permission is set (already configured)
+     - `setup-node@v4` is used with `registry-url` (already configured)
+     - `--provenance` flag is used (already configured)
+   - npm will automatically authenticate using GitHub's OIDC provider
+
+   **Why Trusted Publishing?**
+   - No long-lived tokens to rotate (npm now limits granular tokens to 90 days max)
+   - More secure: uses temporary, job-specific credentials
+   - Automatic provenance attestation
+   - Aligns with npm's new security requirements ([see announcement](https://github.blog/changelog/2025-09-29-strengthening-npm-security-important-changes-to-authentication-and-token-management/))
+
+   **Note**: If you want to verify trusted publishing is working, check the workflow logs - you'll see OIDC authentication instead of token-based auth.
 
 ### PyPI Publishing
 
@@ -96,8 +133,12 @@ pnpm ci
 pnpm build
 
 # 4. Publish
+# Note: --access public is required for scoped packages, optional for unscoped
+# (Our package is unscoped, but --access public doesn't hurt)
 npm publish --access public
 ```
+
+**Note**: Your package (`schemabridge`) is **unscoped**, so `--access public` is technically optional, but it's included in the workflow for consistency and in case you ever scope it (e.g., `@iamtemi/schemabridge`).
 
 #### PyPI (Manual)
 
@@ -134,9 +175,16 @@ The base path is configured in `docs/.vitepress/config.ts` as `/schemabridge/`.
 
 ### npm publish fails
 
-- Check `NPM_TOKEN` secret is set correctly
-- Verify you're not already logged in locally (conflicts with token)
-- Ensure version doesn't already exist on npm
+- **If using Trusted Publishing (OIDC)**:
+  - Verify trusted publishing is set up at https://www.npmjs.com/settings/YOUR_USERNAME/oauth-applications
+  - Check that the workflow has `id-token: write` permission (already configured)
+  - Ensure the GitHub App/OAuth app has "Publish packages" permission
+  - Check workflow logs for OIDC authentication errors
+- **If using tokens (legacy)**:
+  - Check `NPM_TOKEN` secret is set correctly (if still using tokens)
+  - Verify token hasn't expired (granular tokens now expire in 7-90 days)
+  - Ensure version doesn't already exist on npm
+  - **Note**: Consider migrating to trusted publishing to avoid token rotation
 
 ### PyPI publish fails
 

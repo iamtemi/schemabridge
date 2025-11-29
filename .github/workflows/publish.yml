@@ -46,6 +46,8 @@ jobs:
       - name: Publish to npm
         run: npm publish --provenance --access public
         env:
+          # Temporary: using token for first publish (passkey 2FA doesn't work with CLI)
+          # After first publish, remove NPM_TOKEN and this will use OIDC automatically
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
   publish-pypi:
