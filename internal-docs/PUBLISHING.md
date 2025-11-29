@@ -81,17 +81,18 @@ This document explains how to publish SchemaBridge to npm, PyPI, and deploy docu
 
 1. Trigger the **Publish** workflow via **Actions → Publish → Run workflow**.
 2. Provide the new version in the `version` input (e.g., `0.1.1`) and set `dry_run` to `true`.
-3. The workflow will:
+3. Leave `publish_npm` / `publish_pypi` checked (default) to test both registries, or toggle either off if you only want to exercise one path.
+4. The workflow will:
    - Build everything exactly as production does
    - Run `npm publish --dry-run`
    - Upload the Python artifacts to **TestPyPI** (`https://test.pypi.org/project/schemabridge/`)
-4. Verify the artifacts if desired:
+5. Verify the artifacts if desired:
 
    ```bash
    pip install --index-url https://test.pypi.org/simple schemabridge==0.1.1
    ```
 
-5. Once satisfied, run the real release (GitHub Release or workflow dispatch with `dry_run=false`).
+6. Once satisfied, run the real release (GitHub Release or workflow dispatch with `dry_run=false`).
 
 ### Option 1: Automated (Recommended)
 
