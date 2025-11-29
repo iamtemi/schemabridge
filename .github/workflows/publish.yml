@@ -61,6 +61,7 @@ jobs:
           path: |
             dist/
             bin/
+            python/
             package.json
             README.md
             LICENSE
@@ -87,11 +88,6 @@ jobs:
         with:
           name: npm-package
 
-      - name: Install pnpm # Added pnpm setup
-        uses: pnpm/action-setup@v4
-        with:
-          version: 10
-
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -99,14 +95,9 @@ jobs:
           registry-url: 'https://registry.npmjs.org'
 
       - name: Publish to npm
-        run: npm publish --dry-run --provenance --access public
+        run: npm publish --dry-run --provenance --access public --ignore-scripts
         # IMPORTANT: This uses npm Trusted Publishing (OIDC).
-        # For this to work, you MUST:
-        # 1. Create the package on npmjs.com first.
-        # 2. In your npm package settings, under "Trusted Publishers", add this repository.
-        # This will grant the workflow permission to publish new versions.
-        # The E404 error you saw likely means the package doesn't exist or isn't configured for trusted publishing.
-        # --ignore-scripts is removed because pnpm is now installed. --dry-run is for testing.
+        # --ignore-scripts is used because we've already built everything in the build job.
 
   publish-pypi:
     name: Publish to PyPI
@@ -127,6 +118,3 @@ jobs:
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
         # IMPORTANT: This uses PyPI Trusted Publishing (OIDC).
-        # For this to work, you MUST configure this repository as a "Trusted Publisher"
-        # in your PyPI project settings.
-        # https://pypi.org/manage/project/schemabridge/settings/publishing/

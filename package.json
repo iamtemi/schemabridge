@@ -35,7 +35,6 @@
     "format:check": "prettier --check .",
     "set-version": "node scripts/set-version.js",
     "ci": "pnpm typecheck && pnpm lint && pnpm format:check && pnpm test:coverage",
-    "prepublishOnly": "pnpm run build",
     "prepare": "command -v husky >/dev/null 2>&1 && husky || true"
   },
   "keywords": [
