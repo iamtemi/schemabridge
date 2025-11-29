@@ -77,7 +77,12 @@ export async function convertFolder(options: ConvertFolderOptions): Promise<Conv
       schemaFiles.set(key, schema.file);
     } else {
       // If this is from a re-export file (index.ts), skip it
-      const originalFile = schemaFiles.get(key)!;
+      const originalFile = schemaFiles.get(key);
+      if (!originalFile) {
+        schemaMap.set(key, schema);
+        schemaFiles.set(key, schema.file);
+        continue;
+      }
       const isReExport =
         path.basename(schema.file) === 'index.ts' || path.basename(schema.file) === 'index.js';
       if (isReExport) {

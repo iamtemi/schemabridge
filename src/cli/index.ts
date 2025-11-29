@@ -9,23 +9,30 @@ import {
   type Target,
 } from '../index.js';
 
-interface ParsedArgs {
-  mode: 'file' | 'folder';
-  // File mode
-  inputFile?: string;
-  exportName?: string;
-  // Folder mode
-  sourceDir?: string;
-  // Common
+type FolderArgs = {
+  mode: 'folder';
+  sourceDir: string;
+  out: string;
   target: Target | 'all';
-  out?: string;
   allowUnresolved: boolean;
-  flat?: boolean;
-  generateInitFiles?: boolean;
+  flat: boolean;
+  generateInitFiles: boolean;
   /** Optional export name pattern (wildcard, e.g. "*Schema") for folder mode */
   exportNamePattern?: string;
   tsconfigPath?: string;
-}
+};
+
+type FileArgs = {
+  mode: 'file';
+  inputFile: string;
+  exportName: string;
+  target: Target | 'all';
+  allowUnresolved: boolean;
+  out?: string;
+  tsconfigPath?: string;
+};
+
+type ParsedArgs = FolderArgs | FileArgs;
 
 const USAGE = `
 Usage:
@@ -60,11 +67,11 @@ export async function runCLI(argv: string[] = process.argv.slice(2)): Promise<nu
     // Handle folder conversion
     if (parsed.mode === 'folder') {
       const result = await convertFolder({
-        sourceDir: parsed.sourceDir!,
-        outDir: parsed.out!,
+        sourceDir: parsed.sourceDir,
+        outDir: parsed.out,
         target: parsed.target,
         preserveStructure: !parsed.flat,
-        generateInitFiles: parsed.generateInitFiles || false,
+        generateInitFiles: parsed.generateInitFiles,
         registerTsLoader: true,
         allowUnresolved: parsed.allowUnresolved,
         ...(parsed.exportNamePattern !== undefined && {
@@ -91,8 +98,8 @@ export async function runCLI(argv: string[] = process.argv.slice(2)): Promise<nu
 
     // Handle single file conversion
     const { schema, warnings } = await loadZodSchema({
-      file: parsed.inputFile!,
-      exportName: parsed.exportName!,
+      file: parsed.inputFile,
+      exportName: parsed.exportName,
       registerTsLoader: true,
       ...(parsed.tsconfigPath !== undefined && { tsconfigPath: parsed.tsconfigPath }),
       allowUnresolved: parsed.allowUnresolved,
@@ -104,10 +111,10 @@ export async function runCLI(argv: string[] = process.argv.slice(2)): Promise<nu
 
     const generateOptions: Parameters<typeof generateFilesFromZod>[0] = {
       schema,
-      name: parsed.exportName!,
+      name: parsed.exportName,
       target: parsed.target,
       allowUnresolved: parsed.allowUnresolved,
-      sourceModule: parsed.inputFile!,
+      sourceModule: parsed.inputFile,
     };
     if (parsed.out !== undefined) {
       generateOptions.out = parsed.out;
@@ -152,7 +159,7 @@ function parseArgs(argv: string[]): ParsedArgs {
   return parseFileArgs(rest);
 }
 
-function parseFileArgs(rest: string[]): ParsedArgs {
+function parseFileArgs(rest: string[]): FileArgs {
   if (rest.length === 0) {
     throw new Error('Missing <input-file>');
   }
@@ -223,7 +230,7 @@ function parseFileArgs(rest: string[]): ParsedArgs {
     throw new Error('Missing required --export <schema-name>');
   }
 
-  const result: ParsedArgs = {
+  const result: FileArgs = {
     mode: 'file',
     inputFile: path.resolve(inputFile),
     exportName,
@@ -237,7 +244,7 @@ function parseFileArgs(rest: string[]): ParsedArgs {
   return result;
 }
 
-function parseFolderArgs(rest: string[]): ParsedArgs {
+function parseFolderArgs(rest: string[]): FolderArgs {
   if (rest.length === 0) {
     throw new Error('Missing <source-dir>');
   }
