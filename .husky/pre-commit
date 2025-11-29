@@ -12,5 +12,18 @@ pnpm lint
 # Run type check
 pnpm typecheck
 
+# Optional: Python lint/typecheck if tools are available
+if command -v ruff >/dev/null 2>&1; then
+  python -m ruff check schemabridge
+else
+  echo "ruff not found; skipping Python lint. Install with: pip install ruff"
+fi
+
+if command -v mypy >/dev/null 2>&1; then
+  python -m mypy schemabridge --strict
+else
+  echo "mypy not found; skipping Python typecheck. Install with: pip install mypy"
+fi
+
 # Run tests (quick, no coverage for pre-commit)
 pnpm test

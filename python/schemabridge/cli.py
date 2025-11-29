@@ -1,8 +1,8 @@
 """CLI wrapper for SchemaBridge Node.js implementation."""
 
-import sys
-import subprocess
 import shutil
+import subprocess
+import sys
 from pathlib import Path
 from typing import NoReturn, Optional
 
