@@ -7,7 +7,7 @@ from datetime import date
 
 class ApiRequestSchema(BaseModel):
     class Headers(BaseModel):
-        Content_Type: str = Field(alias="Content-Type")
+        Content_Type: str = Field(alias="Content-Type", default=...)
         Authorization: Optional[str] = None
         X_Request_ID: Optional[str] = Field(alias="X-Request-ID", default=None)
         User_Agent: Optional[str] = Field(alias="User-Agent", default=None)

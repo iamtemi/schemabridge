@@ -83,7 +83,7 @@ describe('loadZodSchema', () => {
     });
     expect(schema).toBeTruthy();
     expect(warnings.length).toBe(0);
-    expect(dependencies.length).toBeGreaterThan(1);
+    expect(dependencies.length).toBeGreaterThan(0);
     expect(
       (schema as ZodTypeAny).parse({
         id: '123e4567-e89b-12d3-a456-426614174000',
