@@ -118,22 +118,17 @@ jobs:
           node-version: '22.x'
           registry-url: 'https://registry.npmjs.org'
 
-      - name: Get npm provenance token
-        id: npm_provenance
-        uses: npm/actions/npm-auth@v1
-        with:
-          registry: https://registry.npmjs.org
-
       - name: Publish to npm (dry run)
         if: github.event_name == 'workflow_dispatch' && github.event.inputs.dry_run == 'true'
         run: npm publish --dry-run --access public --ignore-scripts
 
       - name: Publish to npm
         if: github.event_name != 'workflow_dispatch' || github.event.inputs.dry_run != 'true'
-        run: npm publish --access public --provenance --ignore-scripts
-        env:
-          NODE_AUTH_TOKEN: ${{ steps.npm_provenance.outputs.token }}
+        run: npm publish --provenance --access public --ignore-scripts
         # IMPORTANT: This uses npm Trusted Publishing (OIDC).
+        # With trusted publishing configured, provenance is automatically generated.
+        # The --provenance flag is included for explicitness.
+        # Authentication is handled via OIDC, no token needed.
         # --ignore-scripts is used because we've already built everything in the build job.
 
   publish-pypi:
