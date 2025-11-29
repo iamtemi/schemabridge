@@ -46,11 +46,18 @@ jobs:
       - name: Publish to npm
         run: npm publish --provenance --access public
         # Uses npm Trusted Publishing (OIDC) - no token needed!
-        # This bypasses 2FA requirements. Requires: id-token: write permission (already set above)
+        # Works automatically with GitHub Actions when:
+        # - id-token: write permission is set (already configured above)
+        # - setup-node@v4 with registry-url is used (already configured above)
+        # - --provenance flag is used (already set above)
+        # - Package exists on npm (published manually for first version)
 
   publish-pypi:
     name: Publish to PyPI
     runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/project/schemabridge/
     permissions:
       contents: read
       id-token: write # Required for PyPI trusted publishing
@@ -90,7 +97,6 @@ jobs:
 
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
-        with:
-          # Temporary: using API token for first publish
-          # After first publish, set up trusted publishing and remove this
-          password: ${{ secrets.PYPI_API_TOKEN }}
+        # Uses PyPI Trusted Publishing (OIDC) - no token needed!
+        # Requires trusted publishing to be set up at:
+        # https://pypi.org/manage/account/publishing/
