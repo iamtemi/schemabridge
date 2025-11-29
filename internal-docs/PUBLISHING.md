@@ -62,6 +62,7 @@ This document explains how to publish SchemaBridge to npm, PyPI, and deploy docu
    - Repository name: `schemabridge`
    - Workflow filename: `.github/workflows/publish.yml`
    - PyPI will verify and activate it
+   - Do the same on [TestPyPI](https://test.pypi.org/manage/account/publishing/) with the **environment** field set to `testpypi` so dry runs can publish successfully
 
    **Alternative (legacy)**: If you prefer API tokens:
    - Create a token at https://pypi.org/manage/account/token/
