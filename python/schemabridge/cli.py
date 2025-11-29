@@ -4,10 +4,10 @@ import sys
 import subprocess
 import shutil
 from pathlib import Path
-from typing import NoReturn
+from typing import NoReturn, Optional
 
 
-def find_node_executable() -> str | None:
+def find_node_executable() -> Optional[str]:
     """Find the Node.js executable in the system PATH."""
     return shutil.which("node")
 

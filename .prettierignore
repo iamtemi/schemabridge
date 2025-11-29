@@ -5,6 +5,8 @@ node_modules/
 # Build outputs
 dist/
 bin/*.js
+bin/**/*.js
+python/**/*.js
 *.tsbuildinfo
 
 # Coverage
