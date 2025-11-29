@@ -99,7 +99,7 @@ jobs:
     name: Publish to npm
     needs: build
     runs-on: ubuntu-latest
-    if: ${{ github.event_name != 'workflow_dispatch' || github.event.inputs.publish_npm != 'false' }}
+    if: github.event_name != 'workflow_dispatch' || github.event.inputs.publish_npm != 'false'
     environment:
       name: npm
       url: https://www.npmjs.com/package/schemabridge
@@ -136,8 +136,8 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     if: >-
-      ${{ (github.event_name != 'workflow_dispatch' || github.event.inputs.publish_pypi != 'false') &&
-          (github.event_name != 'workflow_dispatch' || github.event.inputs.dry_run != 'true') }}
+      (github.event_name != 'workflow_dispatch' || github.event.inputs.publish_pypi != 'false') &&
+      (github.event_name != 'workflow_dispatch' || github.event.inputs.dry_run != 'true')
     environment:
       name: pypi
       url: https://pypi.org/project/schemabridge/
@@ -158,9 +158,9 @@ jobs:
     name: Publish to TestPyPI
     needs: build
     if: >-
-      ${{ github.event_name == 'workflow_dispatch' &&
-          github.event.inputs.dry_run == 'true' &&
-          github.event.inputs.publish_pypi != 'false' }}
+      github.event_name == 'workflow_dispatch' &&
+      github.event.inputs.dry_run == 'true' &&
+      github.event.inputs.publish_pypi != 'false'
     runs-on: ubuntu-latest
     environment:
       name: testpypi
