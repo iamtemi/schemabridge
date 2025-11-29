@@ -38,7 +38,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Run tests
-        run: pnpm ci
+        run: pnpm run ci
 
       - name: Build
         run: pnpm build
