@@ -87,7 +87,6 @@
   "files": [
     "dist",
     "bin",
-    "python",
     "README.md",
     "LICENSE"
   ]

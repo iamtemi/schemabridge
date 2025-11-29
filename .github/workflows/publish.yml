@@ -1,8 +1,5 @@
 name: Publish
-run-name: >-
-  ${{ github.event_name == 'workflow_dispatch'
-      ? (github.event.inputs.run_name != '' ? format('Publish: {0}', github.event.inputs.run_name) : 'Publish (manual)')
-      : 'Publish' }}
+run-name: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.run_name != '' && format('Publish ({0})', github.event.inputs.run_name) || 'Publish' }}
 
 on:
   release:
@@ -84,7 +81,6 @@ jobs:
           path: |
             dist/
             bin/
-            python/
             package.json
             README.md
             LICENSE
@@ -99,7 +95,7 @@ jobs:
     name: Publish to npm
     needs: build
     runs-on: ubuntu-latest
-    if: ${{ github.event_name != 'workflow_dispatch' || github.event.inputs.publish_npm != 'false' }}
+    if: ${{ github.event_name != 'workflow_dispatch' || github.event.inputs.publish_npm }}
     environment:
       name: npm
       url: https://www.npmjs.com/package/schemabridge
@@ -119,11 +115,11 @@ jobs:
           registry-url: 'https://registry.npmjs.org'
 
       - name: Publish to npm (dry run)
-        if: github.event_name == 'workflow_dispatch' && github.event.inputs.dry_run == 'true'
+        if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.dry_run }}
         run: npm publish --dry-run --access public --ignore-scripts
 
       - name: Publish to npm
-        if: github.event_name != 'workflow_dispatch' || github.event.inputs.dry_run != 'true'
+        if: ${{ github.event_name != 'workflow_dispatch' || !github.event.inputs.dry_run }}
         run: npm publish --provenance --access public --ignore-scripts
         # IMPORTANT: This uses npm Trusted Publishing (OIDC).
         # With trusted publishing configured, provenance is automatically generated.
@@ -136,8 +132,8 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     if: >-
-      ${{ (github.event_name != 'workflow_dispatch' || github.event.inputs.publish_pypi != 'false') &&
-          (github.event_name != 'workflow_dispatch' || github.event.inputs.dry_run != 'true') }}
+      ${{ github.event_name != 'workflow_dispatch' ||
+          (github.event.inputs.publish_pypi && !github.event.inputs.dry_run) }}
     environment:
       name: pypi
       url: https://pypi.org/project/schemabridge/
@@ -159,8 +155,8 @@ jobs:
     needs: build
     if: >-
       ${{ github.event_name == 'workflow_dispatch' &&
-          github.event.inputs.dry_run == 'true' &&
-          github.event.inputs.publish_pypi != 'false' }}
+          github.event.inputs.dry_run &&
+          github.event.inputs.publish_pypi }}
     runs-on: ubuntu-latest
     environment:
       name: testpypi
