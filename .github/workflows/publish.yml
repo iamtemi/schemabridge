@@ -56,10 +56,11 @@ jobs:
           name: npm-package
           path: |
             dist/
+            bin/
+            python/
             package.json
             README.md
             LICENSE
-            bin/ # Added bin/ to artifact
 
       - name: Upload Python package artifact
         uses: actions/upload-artifact@v4
@@ -95,13 +96,14 @@ jobs:
           registry-url: 'https://registry.npmjs.org'
 
       - name: Publish to npm
-        run: npm publish --provenance --access public
+        run: npm publish --provenance --access public --ignore-scripts
         # IMPORTANT: This uses npm Trusted Publishing (OIDC).
         # For this to work, you MUST:
         # 1. Create the package on npmjs.com first.
         # 2. In your npm package settings, under "Trusted Publishers", add this repository.
         # This will grant the workflow permission to publish new versions.
         # The E404 error you saw likely means the package doesn't exist or isn't configured for trusted publishing.
+        # --ignore-scripts is used because we've already built everything in the build job.
 
   publish-pypi:
     name: Publish to PyPI
