@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { execSync } from 'node:child_process';
 import fs from 'node:fs/promises';
 import os from 'node:os';
@@ -14,6 +14,17 @@ const makeTempDir = async () => {
   return dir;
 };
 
+let bundledCliExists = false;
+
+beforeAll(async () => {
+  try {
+    await fs.access(BUNDLED_CLI);
+    bundledCliExists = true;
+  } catch {
+    bundledCliExists = false;
+  }
+});
+
 afterEach(async () => {
   for (const dir of cleanupDirs) {
     await fs.rm(dir, { recursive: true, force: true });
@@ -23,6 +34,9 @@ afterEach(async () => {
 
 describe('Bundled CLI (bin/schemabridge.js)', () => {
   it('should exist and be executable', async () => {
+    if (!bundledCliExists) {
+      expect.fail('Bundled CLI not found. Run `pnpm build` first.');
+    }
     const stats = await fs.stat(BUNDLED_CLI);
     expect(stats.isFile()).toBe(true);
     // Check it's executable (has execute bit set)
@@ -31,6 +45,9 @@ describe('Bundled CLI (bin/schemabridge.js)', () => {
   });
 
   it('should show help when --help is passed', () => {
+    if (!bundledCliExists) {
+      expect.fail('Bundled CLI not found. Run `pnpm build` first.');
+    }
     try {
       execSync(`node ${BUNDLED_CLI} --help`, { encoding: 'utf8', stdio: 'pipe' });
       expect.fail('Should have thrown an error');
@@ -43,6 +60,9 @@ describe('Bundled CLI (bin/schemabridge.js)', () => {
   });
 
   it('should convert a single schema to pydantic', async () => {
+    if (!bundledCliExists) {
+      expect.fail('Bundled CLI not found. Run `pnpm build` first.');
+    }
     const tmp = await makeTempDir();
     const outPath = path.join(tmp, 'model.py');
 
@@ -59,6 +79,9 @@ describe('Bundled CLI (bin/schemabridge.js)', () => {
   });
 
   it('should convert a single schema to typescript', async () => {
+    if (!bundledCliExists) {
+      expect.fail('Bundled CLI not found. Run `pnpm build` first.');
+    }
     const tmp = await makeTempDir();
     const outPath = path.join(tmp, 'model.d.ts');
 
@@ -74,6 +97,9 @@ describe('Bundled CLI (bin/schemabridge.js)', () => {
   });
 
   it('should convert folder with --flat flag', async () => {
+    if (!bundledCliExists) {
+      expect.fail('Bundled CLI not found. Run `pnpm build` first.');
+    }
     const tmp = await makeTempDir();
     const sourceDir = path.resolve('tests/fixtures');
     const outDir = path.join(tmp, 'output');
@@ -90,6 +116,9 @@ describe('Bundled CLI (bin/schemabridge.js)', () => {
   });
 
   it('should handle errors gracefully', () => {
+    if (!bundledCliExists) {
+      expect.fail('Bundled CLI not found. Run `pnpm build` first.');
+    }
     try {
       execSync(`node ${BUNDLED_CLI} convert zod nonexistent.ts --export test`, {
         encoding: 'utf8',
