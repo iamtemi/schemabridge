@@ -56,14 +56,20 @@ jobs:
         if: github.event_name == 'workflow_dispatch' && github.event.inputs.version != ''
         run: pnpm run set-version ${{ github.event.inputs.version }}
 
-      - name: Run tests
-        run: pnpm run ci
+      - name: Type check
+        run: pnpm typecheck
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Format check
+        run: pnpm format:check
 
       - name: Build Node.js project
         run: pnpm build
 
-      - name: Test bundled CLI
-        run: pnpm test:unit tests/unit/bundled-cli.test.ts
+      - name: Run tests
+        run: pnpm test:coverage
 
       - name: Setup Python
         uses: actions/setup-python@v5
