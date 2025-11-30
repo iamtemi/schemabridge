@@ -86,7 +86,10 @@ describe('emitPydanticModel', () => {
       ]),
     });
 
-    const code = convertZodToPydantic(schema, { name: 'UnionExample' }).trim();
+    const code = convertZodToPydantic(schema, {
+      name: 'UnionExample',
+      enumStyle: 'literal',
+    }).trim();
 
     expect(code).toBe(
       [
@@ -178,5 +181,133 @@ describe('emitPydanticModel', () => {
     expect(regexWarnings[0]?.message).toContain('y');
     expect(regexWarnings[0]?.message).toContain('are not mapped to Python');
     expect(regexWarnings[0]?.path).toEqual(['field']);
+  });
+});
+
+describe('Enum support', () => {
+  it('converts standalone enum to Python Enum class', async () => {
+    const schema = z.enum(['active', 'inactive', 'suspended']);
+
+    const code = convertZodToPydantic(schema, { name: 'StatusEnum' }).trim();
+
+    expect(code).toBe(
+      [
+        'from enum import Enum',
+        '',
+        'class StatusEnum(str, Enum):',
+        '    ACTIVE = "active"',
+        '    INACTIVE = "inactive"',
+        '    SUSPENDED = "suspended"',
+      ].join('\n'),
+    );
+
+    await assertValidPythonSyntax(code);
+  });
+
+  it('generates enum classes for enum fields in objects (default enumStyle)', async () => {
+    const schema = z.object({
+      status: z.enum(['pending', 'done', 'cancelled']),
+      currency: z.enum(['USD', 'EUR', 'GBP']),
+    });
+
+    const code = convertZodToPydantic(schema, { name: 'OrderSchema' }).trim();
+
+    expect(code).toContain('from enum import Enum');
+    expect(code).toContain('class StatusEnum(str, Enum):');
+    expect(code).toContain('    PENDING = "pending"');
+    expect(code).toContain('class CurrencyEnum(str, Enum):');
+    expect(code).toContain('    USD = "USD"');
+    expect(code).toContain('status: StatusEnum');
+    expect(code).toContain('currency: CurrencyEnum');
+
+    await assertValidPythonSyntax(code);
+  });
+
+  it('uses Literal types when enumStyle is literal (backward compatible)', async () => {
+    const schema = z.object({
+      status: z.enum(['pending', 'done']),
+    });
+
+    const code = convertZodToPydantic(schema, { name: 'OrderSchema', enumStyle: 'literal' }).trim();
+
+    expect(code).not.toContain('from enum import Enum');
+    expect(code).not.toContain('class StatusEnum');
+    expect(code).toContain('from typing import Literal');
+    expect(code).toContain('status: Literal["pending", "done"]');
+
+    await assertValidPythonSyntax(code);
+  });
+
+  it('references same enum class when enum values match', async () => {
+    const schema = z.object({
+      status1: z.enum(['active', 'inactive']),
+      status2: z.enum(['active', 'inactive']), // Same values
+    });
+
+    const code = convertZodToPydantic(schema, { name: 'TestSchema' }).trim();
+
+    // Should only generate one enum class
+    const enumClassMatches = code.match(/class \w+Enum\(str, Enum\):/g);
+    expect(enumClassMatches?.length).toBe(1);
+
+    // Both fields should reference the same enum
+    expect(code).toMatch(/status1: \w+Enum/);
+    expect(code).toMatch(/status2: \w+Enum/);
+    const status1Match = code.match(/status1: (\w+Enum)/);
+    const status2Match = code.match(/status2: (\w+Enum)/);
+    expect(status1Match?.[1]).toBe(status2Match?.[1]);
+
+    await assertValidPythonSyntax(code);
+  });
+
+  it('generates separate enum classes for different enum values', async () => {
+    const schema = z.object({
+      status: z.enum(['active', 'inactive']),
+      role: z.enum(['admin', 'user']),
+    });
+
+    const code = convertZodToPydantic(schema, { name: 'TestSchema' }).trim();
+
+    expect(code).toContain('class StatusEnum(str, Enum):');
+    expect(code).toContain('class RoleEnum(str, Enum):');
+    expect(code).toContain('status: StatusEnum');
+    expect(code).toContain('role: RoleEnum');
+
+    await assertValidPythonSyntax(code);
+  });
+
+  it('supports enumBaseType option', async () => {
+    const schema = z.enum(['one', 'two', 'three']);
+
+    const code = convertZodToPydantic(schema, { name: 'NumberEnum', enumBaseType: 'int' }).trim();
+
+    expect(code).toContain('class NumberEnum(int, Enum):');
+
+    await assertValidPythonSyntax(code);
+  });
+
+  it('handles enum member name sanitization for special characters', async () => {
+    const schema = z.enum(['value-1', 'value_2', 'value 3']);
+
+    const code = convertZodToPydantic(schema, { name: 'TestEnum' }).trim();
+
+    expect(code).toContain('VALUE_1 = "value-1"');
+    expect(code).toContain('VALUE_2 = "value_2"');
+    expect(code).toContain('VALUE_3 = "value 3"');
+
+    await assertValidPythonSyntax(code);
+  });
+
+  it('handles optional enum fields', async () => {
+    const schema = z.object({
+      status: z.enum(['active', 'inactive']).optional(),
+    });
+
+    const code = convertZodToPydantic(schema, { name: 'TestSchema' }).trim();
+
+    expect(code).toContain('from typing import Optional');
+    expect(code).toContain('status: Optional[StatusEnum]');
+
+    await assertValidPythonSyntax(code);
   });
 });

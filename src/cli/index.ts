@@ -20,6 +20,8 @@ type FolderArgs = {
   /** Optional export name pattern (wildcard, e.g. "*Schema") for folder mode */
   exportNamePattern?: string;
   tsconfigPath?: string;
+  enumStyle?: 'enum' | 'literal';
+  enumBaseType?: 'str' | 'int';
 };
 
 type FileArgs = {
@@ -30,14 +32,16 @@ type FileArgs = {
   allowUnresolved: boolean;
   out?: string;
   tsconfigPath?: string;
+  enumStyle?: 'enum' | 'literal';
+  enumBaseType?: 'str' | 'int';
 };
 
 type ParsedArgs = FolderArgs | FileArgs;
 
 const USAGE = `
 Usage:
-  schemabridge convert zod <input-file> --export <schema-name> [--to pydantic|typescript|all] [--out <path>] [--allow-unresolved]
-  schemabridge convert folder <source-dir> --out <output-dir> [--to pydantic|typescript|all] [--flat] [--init] [--export-pattern <pattern>] [--allow-unresolved]
+  schemabridge convert zod <input-file> --export <schema-name> [--to pydantic|typescript|all] [--out <path>] [--allow-unresolved] [--enum-style enum|literal] [--enum-base-type str|int]
+  schemabridge convert folder <source-dir> --out <output-dir> [--to pydantic|typescript|all] [--flat] [--init] [--export-pattern <pattern>] [--allow-unresolved] [--enum-style enum|literal] [--enum-base-type str|int]
 
 Commands:
   convert zod    Convert a single Zod schema from a file
@@ -46,6 +50,12 @@ Commands:
 Examples:
   # Convert single schema
   schemabridge convert zod input.ts --export enrichedTransactionSchema --to pydantic --out model.py
+  
+  # Convert standalone enum
+  schemabridge convert zod enums.ts --export statusEnum --to pydantic --out status.py
+  
+  # Convert with enum options
+  schemabridge convert zod input.ts --export schema --to pydantic --out model.py --enum-style literal --enum-base-type str
   
   # Convert all schemas in a folder (preserves structure)
   schemabridge convert folder ./src/schemas --out ./generated --to pydantic
@@ -78,6 +88,8 @@ export async function runCLI(argv: string[] = process.argv.slice(2)): Promise<nu
           exportNamePattern: parsed.exportNamePattern,
         }),
         ...(parsed.tsconfigPath !== undefined && { tsconfigPath: parsed.tsconfigPath }),
+        ...(parsed.enumStyle !== undefined && { enumStyle: parsed.enumStyle }),
+        ...(parsed.enumBaseType !== undefined && { enumBaseType: parsed.enumBaseType }),
       });
 
       for (const warning of result.warnings) {
@@ -118,6 +130,12 @@ export async function runCLI(argv: string[] = process.argv.slice(2)): Promise<nu
     };
     if (parsed.out !== undefined) {
       generateOptions.out = parsed.out;
+    }
+    if (parsed.enumStyle !== undefined) {
+      generateOptions.enumStyle = parsed.enumStyle;
+    }
+    if (parsed.enumBaseType !== undefined) {
+      generateOptions.enumBaseType = parsed.enumBaseType;
     }
     const results = await generateFilesFromZod(generateOptions);
 
@@ -173,6 +191,8 @@ function parseFileArgs(rest: string[]): FileArgs {
   let out: string | undefined;
   let allowUnresolved = false;
   let tsconfigPath: string | undefined;
+  let enumStyle: 'enum' | 'literal' | undefined;
+  let enumBaseType: 'str' | 'int' | undefined;
 
   for (let i = 1; i < rest.length; i++) {
     const arg = rest[i];
@@ -217,6 +237,28 @@ function parseFileArgs(rest: string[]): FileArgs {
         tsconfigPath = val;
         break;
       }
+      case '--enum-style': {
+        const val = rest[++i];
+        if (!val || val.startsWith('-')) {
+          throw new Error('--enum-style requires a value: --enum-style enum|literal');
+        }
+        if (val !== 'enum' && val !== 'literal') {
+          throw new Error('Invalid --enum-style value. Expected "enum" or "literal".');
+        }
+        enumStyle = val;
+        break;
+      }
+      case '--enum-base-type': {
+        const val = rest[++i];
+        if (!val || val.startsWith('-')) {
+          throw new Error('--enum-base-type requires a value: --enum-base-type str|int');
+        }
+        if (val !== 'str' && val !== 'int') {
+          throw new Error('Invalid --enum-base-type value. Expected "str" or "int".');
+        }
+        enumBaseType = val;
+        break;
+      }
       default:
         if (arg.startsWith('-')) {
           throw new Error(`Unknown option: ${arg}`);
@@ -237,6 +279,8 @@ function parseFileArgs(rest: string[]): FileArgs {
     target,
     allowUnresolved,
     ...(tsconfigPath !== undefined && { tsconfigPath }),
+    ...(enumStyle !== undefined && { enumStyle }),
+    ...(enumBaseType !== undefined && { enumBaseType }),
   };
   if (out !== undefined) {
     result.out = out;
@@ -260,6 +304,8 @@ function parseFolderArgs(rest: string[]): FolderArgs {
   let generateInitFiles = false;
   let exportNamePattern: string | undefined;
   let tsconfigPath: string | undefined;
+  let enumStyle: 'enum' | 'literal' | undefined;
+  let enumBaseType: 'str' | 'int' | undefined;
 
   for (let i = 1; i < rest.length; i++) {
     const arg = rest[i];
@@ -310,6 +356,28 @@ function parseFolderArgs(rest: string[]): FolderArgs {
         tsconfigPath = val;
         break;
       }
+      case '--enum-style': {
+        const val = rest[++i];
+        if (!val || val.startsWith('-')) {
+          throw new Error('--enum-style requires a value: --enum-style enum|literal');
+        }
+        if (val !== 'enum' && val !== 'literal') {
+          throw new Error('Invalid --enum-style value. Expected "enum" or "literal".');
+        }
+        enumStyle = val;
+        break;
+      }
+      case '--enum-base-type': {
+        const val = rest[++i];
+        if (!val || val.startsWith('-')) {
+          throw new Error('--enum-base-type requires a value: --enum-base-type str|int');
+        }
+        if (val !== 'str' && val !== 'int') {
+          throw new Error('Invalid --enum-base-type value. Expected "str" or "int".');
+        }
+        enumBaseType = val;
+        break;
+      }
       default:
         if (arg.startsWith('-')) {
           throw new Error(`Unknown option: ${arg}`);
@@ -333,6 +401,8 @@ function parseFolderArgs(rest: string[]): FolderArgs {
     generateInitFiles,
     ...(exportNamePattern !== undefined && { exportNamePattern }),
     ...(tsconfigPath !== undefined && { tsconfigPath }),
+    ...(enumStyle !== undefined && { enumStyle }),
+    ...(enumBaseType !== undefined && { enumBaseType }),
   };
 }
 

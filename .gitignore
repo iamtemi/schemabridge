@@ -75,3 +75,5 @@ examples/pydantic/
 examples/pydantic_flat/
 examples/pydantic_flat_init/
 examples/pydantic_init/
+examples/py-output/
+examples/test-results/

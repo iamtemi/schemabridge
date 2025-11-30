@@ -23,16 +23,21 @@ schemabridge convert folder ./src/schemas --out ./generated --to pydantic --init
 - Preserves structure; use `--flat` for a single directory.
 - `--init` drops `__init__.py` files so Python imports work.
 
-## Enum handling (quick view)
+## Enum handling
 
 ```ts
 export const role = z.enum(['admin', 'viewer']);
 ```
 
-Becomes:
+**Default behavior:**
 
-- Pydantic: `Literal["admin", "viewer"]`
-- TypeScript: `"admin" | "viewer"`
+- Pydantic: Generates `class RoleEnum(str, Enum): ...`
+- TypeScript: `export type RoleEnum = "admin" | "viewer"`
+
+**Options:**
+
+- `--enum-style literal` - Use Literal types instead of Enum classes (Pydantic)
+- `--enum-base-type int` - Use `int, Enum` instead of `str, Enum` (Pydantic)
 
 ## Flags cheat sheet
 
@@ -42,6 +47,8 @@ Becomes:
 - `--init` (folder mode, Python packages)
 - `--allow-unresolved` (warn/continue on import issues)
 - `--tsconfig <path>` (folder/file mode; uses tsx discovery if not set)
+- `--enum-style enum|literal` (enum generation style, default: `enum`)
+- `--enum-base-type str|int` (enum base type, default: `str`)
 
 ## Notes on Zod v4
 
