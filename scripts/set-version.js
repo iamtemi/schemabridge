@@ -6,15 +6,18 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const versionRegex = /^\d+\.\d+\.\d+$/;
+const versionRegex = /^v?\d+\.\d+\.\d+$/;
 // Find the first argument that matches the version pattern (skip '--' separator if present)
-const newVersion = process.argv.slice(2).find((arg) => versionRegex.test(arg));
+const versionArg = process.argv.slice(2).find((arg) => versionRegex.test(arg));
 
-if (!newVersion) {
-  console.error('Error: Please provide a valid version number in the format X.Y.Z');
+if (!versionArg) {
+  console.error('Error: Please provide a valid version number in the format X.Y.Z or vX.Y.Z');
   console.error('Usage: node scripts/set-version.js <version>');
   process.exit(1);
 }
+
+// Strip 'v' prefix if present
+const newVersion = versionArg.startsWith('v') ? versionArg.slice(1) : versionArg;
 
 const rootDir = path.resolve(__dirname, '..');
 const packageJsonPath = path.join(rootDir, 'package.json');
