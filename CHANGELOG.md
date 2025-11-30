@@ -11,6 +11,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Potential `export-name` filter flag for folder conversion
 - More examples and recipes
 
+## [0.2.0] – 2024-11-30
+
+### Added
+
+- **Python Enum Class Support**: Standalone enum exports and enum fields now generate Python Enum classes by default
+  - `class StatusEnum(str, Enum):` with enum members
+  - Enum value deduplication: same enum values reuse the same enum class
+  - CLI flags: `--enum-style` (enum/literal) and `--enum-base-type` (str/int)
+  - Programmatic API: `enumStyle` and `enumBaseType` options
+  - Backward compatible: use `enumStyle: 'literal'` for old Literal type behavior
+- **TypeScript Enum Support**: Standalone enum exports generate union types (`export type EnumName = "val1" | "val2" | ...`)
+- **Bundled CLI Tests**: New test suite ensures the bundled CLI works correctly
+- **Package Size Documentation**: Added `docs/package-size.md` explaining optimization decisions
+
+### Changed
+
+- **Package Size**: Reduced from 3.78 MB to 147 KB (96% reduction)
+  - Disabled source maps in production build (`tsconfig.build.json`)
+  - Added `.npmignore` to exclude unnecessary files
+  - No functional impact on users
+- **Enum Field Handling**: Enum fields in objects now generate enum classes instead of Literal types (default behavior)
+- **Documentation**: Updated API and CLI docs with enum options and examples
+- **Limitations**: Removed outdated enum limitation (enums are now fully supported)
+
+### Fixed
+
+- **Standalone Enum Conversion**: Previously failed with "Root schema must be a Zod object" error, now works correctly
+- **Bundled CLI**: Fixed TypeScript bundling issue that caused "Dynamic require of 'fs'" errors
+
+### Technical
+
+- Added enum class generation logic in `pydantic.ts` emitter
+- Added enum tracking and deduplication in emit context
+- Updated conversion functions to handle enum root nodes
+- Added comprehensive enum tests (14 new test cases)
+- Updated test snapshots to reflect enum class output
+
 ## [0.1.0] – Initial Preview
 
 ### Added
