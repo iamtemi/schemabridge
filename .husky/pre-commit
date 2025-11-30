@@ -1,3 +1,11 @@
+# Check lockfile is in sync with package.json
+# Try to install with frozen lockfile - if it fails, lockfile is out of sync
+if ! pnpm install --frozen-lockfile >/dev/null 2>&1; then
+  echo "❌ pnpm-lock.yaml is out of sync with package.json"
+  echo "Run 'pnpm install' to update the lockfile, then commit again."
+  exit 1
+fi
+
 # Run format check and auto-fix if needed
 if ! pnpm format:check; then
   echo "Formatting issues found. Auto-fixing..."
