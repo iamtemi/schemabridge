@@ -7,8 +7,8 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import type { ZodType } from 'zod';
-import { emitPydanticModel } from './core/emitters/pydantic.js';
-import { emitTypeScriptDefinitions } from './core/emitters/typescript.js';
+import { emitPydanticModel, emitPydanticEnum } from './core/emitters/pydantic.js';
+import { emitTypeScriptDefinitions, emitTypeScriptEnum } from './core/emitters/typescript.js';
 import { visitZodSchema } from './core/ast/zod-visitor.js';
 export { loadZodSchema, SchemaLoadError } from './core/loader/index.js';
 export {
@@ -54,6 +54,20 @@ export interface SchemaConversionOptions {
    * Example: { "user.profile": "UserProfile", "metadata": "CustomMetadata" }
    */
   exportNameOverrides?: Record<string, string>;
+
+  /**
+   * Style for enum generation. Default: 'enum'
+   * - 'enum': Generate Python Enum classes (e.g., `class StatusEnum(str, Enum)`)
+   * - 'literal': Generate Literal types (e.g., `Literal["value1", "value2"]`)
+   */
+  enumStyle?: 'enum' | 'literal';
+
+  /**
+   * Base type for enum classes. Default: 'str'
+   * - 'str': Generate `class EnumName(str, Enum)`
+   * - 'int': Generate `class EnumName(int, Enum)`
+   */
+  enumBaseType?: 'str' | 'int';
 }
 
 /**
@@ -63,16 +77,36 @@ export interface SchemaConversionOptions {
  */
 export function convertZodToPydantic(schema: ZodType, options: SchemaConversionOptions): string {
   const { node, warnings } = visitZodSchema(schema);
-  if (node.type !== 'object') {
-    throw new Error('Root schema must be a Zod object to generate Pydantic models.');
-  }
-  const emitOptions: { name: string; sourceModule?: string; warnings?: typeof warnings } = {
+
+  const emitOptions: {
+    name: string;
+    sourceModule?: string;
+    warnings?: typeof warnings;
+    enumStyle?: 'enum' | 'literal';
+    enumBaseType?: 'str' | 'int';
+  } = {
     name: options.name,
     warnings,
   };
+
   if (options.sourceModule !== undefined) {
     emitOptions.sourceModule = options.sourceModule;
   }
+  if (options.enumStyle !== undefined) {
+    emitOptions.enumStyle = options.enumStyle;
+  }
+  if (options.enumBaseType !== undefined) {
+    emitOptions.enumBaseType = options.enumBaseType;
+  }
+
+  if (node.type === 'enum') {
+    return emitPydanticEnum(node, emitOptions);
+  }
+
+  if (node.type !== 'object') {
+    throw new Error('Root schema must be a Zod object or enum to generate Pydantic models.');
+  }
+
   return emitPydanticModel(node, emitOptions);
 }
 
@@ -83,9 +117,7 @@ export function convertZodToPydantic(schema: ZodType, options: SchemaConversionO
  */
 export function convertZodToTypescript(schema: ZodType, options: SchemaConversionOptions): string {
   const { node, warnings } = visitZodSchema(schema);
-  if (node.type !== 'object') {
-    throw new Error('Root schema must be a Zod object to generate TypeScript interfaces.');
-  }
+
   const emitOptions: {
     name: string;
     sourceModule?: string;
@@ -101,6 +133,15 @@ export function convertZodToTypescript(schema: ZodType, options: SchemaConversio
   if (options.exportNameOverrides !== undefined) {
     emitOptions.exportNameOverrides = options.exportNameOverrides;
   }
+
+  if (node.type === 'enum') {
+    return emitTypeScriptEnum(node, emitOptions);
+  }
+
+  if (node.type !== 'object') {
+    throw new Error('Root schema must be a Zod object or enum to generate TypeScript definitions.');
+  }
+
   return emitTypeScriptDefinitions(node, emitOptions);
 }
 

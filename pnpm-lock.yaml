@@ -11,6 +11,9 @@ importers:
       tsx:
         specifier: ^4.20.6
         version: 4.20.6
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
       vitepress-plugin-group-icons:
         specifier: ^1.6.5
         version: 1.6.5(vite@5.4.21(@types/node@22.19.1))
@@ -51,9 +54,6 @@ importers:
       prettier:
         specifier: ^3.7.2
         version: 3.7.2
-      typescript:
-        specifier: ^5.9.3
-        version: 5.9.3
       typescript-eslint:
         specifier: ^8.48.0
         version: 8.48.0(eslint@9.39.1)(typescript@5.9.3)

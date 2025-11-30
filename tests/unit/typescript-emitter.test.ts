@@ -730,4 +730,14 @@ describe('Parity tests with Zod inference', () => {
     expect(testObj1).toBeDefined();
     expect(testObj2).toBeDefined();
   });
+
+  it('converts standalone enum to TypeScript union type', () => {
+    const schema = z.enum(['active', 'inactive', 'suspended']);
+
+    const code = convertZodToTypescript(schema, { name: 'StatusEnum' }).trim();
+
+    expect(code).toBe('export type StatusEnum = "active" | "inactive" | "suspended";');
+
+    assertValidTypeScriptSyntax(code);
+  });
 });

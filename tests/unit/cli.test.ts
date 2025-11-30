@@ -328,4 +328,135 @@ describe('CLI runCLI', () => {
       );
     });
   });
+
+  describe('enum flags', () => {
+    const enumFixture = path.resolve('examples/source/common/enums.ts');
+
+    it('converts standalone enum with default enum style', async () => {
+      const tmp = await makeTempDir();
+      const code = await runCLI([
+        'convert',
+        'zod',
+        enumFixture,
+        '--export',
+        'statusEnum',
+        '--to',
+        'pydantic',
+        '--out',
+        path.join(tmp, 'status.py'),
+      ]);
+
+      expect(code).toBe(0);
+      const content = await fs.readFile(path.join(tmp, 'status.py'), 'utf8');
+      expect(content).toContain('from enum import Enum');
+      expect(content).toContain('class StatusEnum(str, Enum):');
+      expect(content).toContain('ACTIVE = "active"');
+    });
+
+    it('uses literal style when --enum-style literal is specified', async () => {
+      const tmp = await makeTempDir();
+      const code = await runCLI([
+        'convert',
+        'zod',
+        enumFixture,
+        '--export',
+        'statusEnum',
+        '--to',
+        'pydantic',
+        '--out',
+        path.join(tmp, 'status.py'),
+        '--enum-style',
+        'literal',
+      ]);
+
+      expect(code).toBe(0);
+      const content = await fs.readFile(path.join(tmp, 'status.py'), 'utf8');
+      expect(content).not.toContain('from enum import Enum');
+      expect(content).not.toContain('class StatusEnum');
+      expect(content).toContain('from typing import Literal');
+      expect(content).toContain('Literal["active", "inactive", "suspended"]');
+    });
+
+    it('uses int base type when --enum-base-type int is specified', async () => {
+      const tmp = await makeTempDir();
+      const code = await runCLI([
+        'convert',
+        'zod',
+        enumFixture,
+        '--export',
+        'statusEnum',
+        '--to',
+        'pydantic',
+        '--out',
+        path.join(tmp, 'status.py'),
+        '--enum-base-type',
+        'int',
+      ]);
+
+      expect(code).toBe(0);
+      const content = await fs.readFile(path.join(tmp, 'status.py'), 'utf8');
+      expect(content).toContain('class StatusEnum(int, Enum):');
+    });
+
+    it('works with folder conversion and enum flags', async () => {
+      const tmp = await makeTempDir();
+      const enumDir = path.resolve('examples/source/common');
+      const code = await runCLI([
+        'convert',
+        'folder',
+        enumDir,
+        '--out',
+        tmp,
+        '--to',
+        'pydantic',
+        '--flat',
+        '--enum-style',
+        'enum',
+        '--enum-base-type',
+        'str',
+      ]);
+
+      expect(code).toBe(0);
+      const statusContent = await fs.readFile(path.join(tmp, 'status_enum.py'), 'utf8');
+      expect(statusContent).toContain('class StatusEnum(str, Enum):');
+    });
+
+    it('fails with invalid enum-style value', async () => {
+      const tmp = await makeTempDir();
+      const code = await runCLI([
+        'convert',
+        'zod',
+        enumFixture,
+        '--export',
+        'statusEnum',
+        '--to',
+        'pydantic',
+        '--out',
+        path.join(tmp, 'status.py'),
+        '--enum-style',
+        'invalid',
+      ]);
+
+      expect(code).not.toBe(0);
+    });
+
+    it('fails with invalid enum-base-type value', async () => {
+      const tmp = await makeTempDir();
+      const code = await runCLI([
+        'convert',
+        'zod',
+        enumFixture,
+        '--export',
+        'statusEnum',
+        '--to',
+        'pydantic',
+        '--out',
+        path.join(tmp, 'status.py'),
+        '--enum-base-type',
+        'invalid',
+      ]);
+
+      expect(code).not.toBe(0);
+    });
+  });
 });

@@ -1,5 +1,11 @@
 import type { SchemaNode, VisitorWarning } from '../ast/index.js';
 
+interface EnumClassInfo {
+  name: string;
+  values: readonly string[];
+  baseType: 'str' | 'int';
+}
+
 interface EmitContext {
   typingImports: Set<string>;
   pydanticImports: Set<string>;
@@ -12,12 +18,18 @@ interface EmitContext {
   renderedPaths: Set<string>;
   pathNameMap: Map<string, string>;
   nameCounts: Map<string, number>;
+  enumClasses: Map<string, EnumClassInfo>; // key = sorted values joined by '|'
+  enumClassesToRender: EnumClassInfo[]; // for rendering order
+  enumStyle: 'enum' | 'literal';
+  enumBaseType: 'str' | 'int';
 }
 
 export interface EmitPydanticOptions {
   name: string;
   sourceModule?: string;
   warnings?: VisitorWarning[];
+  enumStyle?: 'enum' | 'literal';
+  enumBaseType?: 'str' | 'int';
 }
 
 /**
@@ -36,15 +48,45 @@ export function emitPydanticModel(root: SchemaNode, options: EmitPydanticOptions
     renderedPaths: new Set(),
     pathNameMap: new Map(),
     nameCounts: new Map(),
+    enumClasses: new Map(),
+    enumClassesToRender: [],
+    enumStyle: options.enumStyle ?? 'enum',
+    enumBaseType: options.enumBaseType ?? 'str',
   };
 
   const classBlock = renderObject(root, options.name, ctx, []);
 
   const importLines = buildImports(ctx);
   const regexLines = buildRegexConstants(ctx);
+  const enumClassesBlock = buildEnumClasses(ctx);
 
-  const sections = [importLines, regexLines, classBlock].filter(Boolean);
+  const sections = [importLines, regexLines, enumClassesBlock, classBlock].filter(Boolean);
   return sections.join('\n\n');
+}
+
+/**
+ * Convert a standalone enum SchemaNode into a Pydantic Enum class or Literal type.
+ */
+export function emitPydanticEnum(root: SchemaNode, options: EmitPydanticOptions): string {
+  if (root.type !== 'enum') {
+    throw new Error('Root schema must be an enum to generate Pydantic Enum class.');
+  }
+
+  const enumStyle = options.enumStyle ?? 'enum';
+
+  if (enumStyle === 'literal') {
+    const literalValues = root.values.map((v) => pythonLiteral(v));
+    return [
+      'from typing import Literal',
+      '',
+      `type ${toPascalCase(options.name)} = Literal[${literalValues.join(', ')}]`,
+    ].join('\n');
+  }
+
+  const enumName = toPascalCase(options.name);
+  const enumClass = renderEnumClass(enumName, root.values, options.enumBaseType ?? 'str');
+
+  return ['from enum import Enum', '', enumClass].join('\n');
 }
 
 function renderObject(
@@ -224,9 +266,42 @@ function buildType(
       return { annotation: 'UUID' };
 
     case 'enum': {
-      ctx.typingImports.add('Literal');
-      const literalValues = node.values.map((v) => pythonLiteral(v));
-      return { annotation: `Literal[${literalValues.join(', ')}]` };
+      if (ctx.enumStyle === 'literal') {
+        ctx.typingImports.add('Literal');
+        const literalValues = node.values.map((v) => pythonLiteral(v));
+        return { annotation: `Literal[${literalValues.join(', ')}]` };
+      }
+
+      // enumStyle === 'enum': generate or reference enum class
+      const key = node.values.slice().sort().join('|');
+      const existingEnum = ctx.enumClasses.get(key);
+
+      if (existingEnum) {
+        // Reference existing enum class
+        return { annotation: existingEnum.name };
+      }
+
+      // Generate new enum class
+      const enumPathKey = path.length > 0 ? `${path.join('.')}.Enum` : 'Enum';
+      const lastPathSegment = path[path.length - 1];
+      const enumName = getNameForPath(
+        enumPathKey,
+        lastPathSegment ? `${toPascalCase(lastPathSegment)}Enum` : 'Enum',
+        ctx,
+        [...path, 'Enum'],
+        currentClass,
+      );
+
+      const enumInfo: EnumClassInfo = {
+        name: enumName,
+        values: node.values,
+        baseType: ctx.enumBaseType,
+      };
+
+      ctx.enumClasses.set(key, enumInfo);
+      ctx.enumClassesToRender.push(enumInfo);
+
+      return { annotation: enumName };
     }
 
     case 'literal': {
@@ -438,6 +513,10 @@ function buildImports(ctx: EmitContext): string {
     lines.push(`from typing import ${typingImports.join(', ')}`);
   }
 
+  if (ctx.enumClassesToRender.length > 0) {
+    lines.push('from enum import Enum');
+  }
+
   const dateImports = [];
   if (ctx.needsDate) dateImports.push('date');
   if (ctx.needsDatetime) dateImports.push('datetime');
@@ -450,6 +529,36 @@ function buildImports(ctx: EmitContext): string {
   }
 
   return lines.join('\n');
+}
+
+function renderEnumClass(name: string, values: readonly string[], baseType: 'str' | 'int'): string {
+  const members = values.map((value) => {
+    const memberName = toEnumMemberName(value);
+    const valueLiteral = pythonString(value);
+    return `    ${memberName} = ${valueLiteral}`;
+  });
+
+  return [`class ${name}(${baseType}, Enum):`, ...members].join('\n');
+}
+
+function buildEnumClasses(ctx: EmitContext): string {
+  if (ctx.enumClassesToRender.length === 0) return '';
+
+  return ctx.enumClassesToRender
+    .map((enumInfo) => renderEnumClass(enumInfo.name, enumInfo.values, enumInfo.baseType))
+    .join('\n\n');
+}
+
+function toEnumMemberName(value: string): string {
+  // Convert string value to valid Python enum member name
+  // Uppercase, replace non-alphanumeric with underscore
+  return (
+    value
+      .toUpperCase()
+      .replace(/[^A-Z0-9_]/g, '_')
+      .replace(/_+/g, '_')
+      .replace(/^_+|_+$/g, '') || 'VALUE'
+  );
 }
 
 function pythonLiteral(value: unknown): string {

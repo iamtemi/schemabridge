@@ -6,21 +6,16 @@ This document outlines current limitations in SchemaBridge and workarounds where
 
 ### Enums
 
-**Limitation:** `z.enum()` schemas cannot be converted to Pydantic models because they're not object schemas.
+**Status:** ✅ `z.enum()` schemas are now fully supported!
 
-**Example:**
+Standalone enum exports are converted to Python Enum classes or TypeScript union types:
 
 ```typescript
 export const status = z.enum(['active', 'inactive']);
-// ❌ Cannot convert - not an object schema
+// ✅ Converts to: class StatusEnum(str, Enum): ...
 ```
 
-**Workaround:** Use object schemas with literal unions:
-
-```typescript
-export const status = z.union([z.literal('active'), z.literal('inactive')]);
-// ✅ Can convert
-```
+Enum fields in objects are converted to enum classes by default (or Literal types if `enumStyle: 'literal'` is specified).
 
 ### Transform, Refine, and Effects
 

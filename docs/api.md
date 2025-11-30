@@ -63,6 +63,8 @@ const result = await convertFolder({
 - `exportNamePattern` - Filter exports by glob (e.g. `*Schema`)
 - `tsconfigPath` - Custom tsconfig for path resolution (tsx still reads from CWD)
 - `registerTsLoader` - Use `tsx` to load TS directly (default: true)
+- `enumStyle` - `'enum'` (default) generates Python Enum classes, `'literal'` generates Literal types
+- `enumBaseType` - `'str'` (default) or `'int'` for enum class base type
 
 ### `loadZodSchema`
 
@@ -97,11 +99,39 @@ schemas.forEach((s) => {
 });
 ```
 
-## Zod v4 and enums
+## Enum Support
+
+Standalone enum exports and enum fields are fully supported:
+
+```typescript
+export const statusEnum = z.enum(['active', 'inactive', 'suspended']);
+```
+
+**Pydantic (default):** Generates Python Enum classes:
+
+```python
+class StatusEnum(str, Enum):
+    ACTIVE = "active"
+    INACTIVE = "inactive"
+    SUSPENDED = "suspended"
+```
+
+**Pydantic (with `enumStyle: 'literal'`):** Generates Literal types:
+
+```python
+status: Literal["active", "inactive", "suspended"]
+```
+
+**TypeScript:** Generates union types:
+
+```typescript
+export type StatusEnum = 'active' | 'inactive' | 'suspended';
+```
+
+## Zod v4
 
 - Prefer `z.date()`, `z.coerce.date()`, `z.string().uuid()`, `z.string().email()`.
 - Avoid deprecated `z.string().datetime()` unless you truly want string output.
-- Enums: `z.enum([...])` → Pydantic `Literal[...]`, TypeScript union.
 
 ::: warning Transform and Refine
 Zod methods like `.transform()` and `.refine()` are runtime-only. SchemaBridge generates types based on the input shape, not the transformed output.

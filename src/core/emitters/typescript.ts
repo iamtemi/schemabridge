@@ -36,13 +36,32 @@ export function emitTypeScriptDefinitions(
     nameCounts: new Map(),
   };
 
+  if (root.type === 'enum') {
+    return emitTypeScriptEnum(root, options);
+  }
+
   if (root.type !== 'object') {
-    throw new Error('Root schema must be a Zod object to generate TypeScript interfaces.');
+    throw new Error('Root schema must be a Zod object or enum to generate TypeScript definitions.');
   }
 
   const interfaceBlock = renderInterface(root, options.name, ctx, []);
 
   return interfaceBlock;
+}
+
+/**
+ * Convert a standalone enum SchemaNode into a TypeScript union type.
+ */
+export function emitTypeScriptEnum(root: SchemaNode, options: EmitTypeScriptOptions): string {
+  if (root.type !== 'enum') {
+    throw new Error('Root schema must be an enum to generate TypeScript enum type.');
+  }
+
+  const typeName = toPascalCase(options.name);
+  const literalValues = root.values.map((v) => typescriptLiteral(v));
+  const unionType = literalValues.join(' | ');
+
+  return `export type ${typeName} = ${unionType};`;
 }
 
 function renderInterface(

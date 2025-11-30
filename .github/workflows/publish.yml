@@ -62,6 +62,9 @@ jobs:
       - name: Build Node.js project
         run: pnpm build
 
+      - name: Test bundled CLI
+        run: pnpm test:unit tests/unit/bundled-cli.test.ts
+
       - name: Setup Python
         uses: actions/setup-python@v5
         with:

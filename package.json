@@ -17,7 +17,7 @@
   "scripts": {
     "build": "pnpm run build:lib && pnpm run build:cli && pnpm run build:python",
     "build:lib": "tsc --project tsconfig.build.json",
-    "build:cli": "esbuild src/cli/index.ts --bundle --format=esm --platform=node --target=node18 --outfile=bin/schemabridge.js --external:tsx/esm --external:zod --banner:js='#!/usr/bin/env node' --minify",
+    "build:cli": "esbuild src/cli/index.ts --bundle --format=esm --platform=node --target=node18 --outfile=bin/schemabridge.js --packages=external --banner:js='#!/usr/bin/env node' --minify",
     "build:python": "mkdir -p python/schemabridge/bin && cp bin/schemabridge.js python/schemabridge/bin/schemabridge.js",
     "dev": "tsx src/cli/index.ts",
     "docs:dev": "vitepress dev docs",
@@ -34,7 +34,9 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "set-version": "node scripts/set-version.js",
+    "test:examples": "node scripts/test-bundled-cli-examples.js --keep",
     "ci": "pnpm typecheck && pnpm lint && pnpm format:check && pnpm test:coverage",
+    "test:bundle": "pnpm build:cli && node bin/schemabridge.js --help > /dev/null && echo 'Bundled CLI works'",
     "prepare": "command -v husky >/dev/null 2>&1 && husky || true"
   },
   "keywords": [
@@ -51,6 +53,7 @@
   "license": "MIT",
   "dependencies": {
     "tsx": "^4.20.6",
+    "typescript": "^5.9.3",
     "vitepress-plugin-group-icons": "^1.6.5",
     "zod": "^4.1.13"
   },
@@ -69,7 +72,6 @@
     "globals": "^16.5.0",
     "husky": "^9.1.7",
     "prettier": "^3.7.2",
-    "typescript": "^5.9.3",
     "typescript-eslint": "^8.48.0",
     "vitepress": "^1.6.4",
     "vitest": "^2.1.9"

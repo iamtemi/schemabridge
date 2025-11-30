@@ -21,6 +21,10 @@ export interface ConvertFolderOptions extends ScanFolderOptions {
   skipEmptyFiles?: boolean;
   /** Whether to generate __init__.py files for Python packages (default: false) */
   generateInitFiles?: boolean;
+  /** Style for enum generation. Default: 'enum' */
+  enumStyle?: 'enum' | 'literal';
+  /** Base type for enum classes. Default: 'str' */
+  enumBaseType?: 'str' | 'int';
 }
 
 export interface ConvertedFile {
@@ -136,13 +140,20 @@ export async function convertFolder(options: ConvertFolderOptions): Promise<Conv
 
       for (const t of targets) {
         try {
-          const output = convertSchema(schemaExport, t, {
+          const convertOptions: Parameters<typeof convertSchema>[2] = {
             preserveStructure,
             outputBasePath,
             sourceFile,
             outDir: resolvedOutDir,
             usedNames,
-          });
+          };
+          if (options.enumStyle !== undefined) {
+            convertOptions.enumStyle = options.enumStyle;
+          }
+          if (options.enumBaseType !== undefined) {
+            convertOptions.enumBaseType = options.enumBaseType;
+          }
+          const output = convertSchema(schemaExport, t, convertOptions);
 
           const outputPath = output.path;
           const outputDir = path.dirname(outputPath);
@@ -204,10 +215,12 @@ function convertSchema(
     sourceFile: string;
     outDir: string;
     usedNames: Map<string, number>;
+    enumStyle?: 'enum' | 'literal';
+    enumBaseType?: 'str' | 'int';
   },
 ): { path: string; content: string } {
   const { schema, exportName } = schemaExport;
-  const { preserveStructure, outputBasePath, outDir, usedNames } = options;
+  const { preserveStructure, outputBasePath, outDir, usedNames, enumStyle, enumBaseType } = options;
 
   // Generate class/interface name from export name
   const className = toPascalCase(exportName);
@@ -238,16 +251,21 @@ function convertSchema(
   }
 
   // Convert schema
+  const conversionOptions: Parameters<typeof convertZodToPydantic>[1] = {
+    name: className,
+    sourceModule: schemaExport.file,
+  };
+  if (enumStyle !== undefined) {
+    conversionOptions.enumStyle = enumStyle;
+  }
+  if (enumBaseType !== undefined) {
+    conversionOptions.enumBaseType = enumBaseType;
+  }
+
   const content =
     target === 'pydantic'
-      ? convertZodToPydantic(schema, {
-          name: className,
-          sourceModule: schemaExport.file,
-        })
-      : convertZodToTypescript(schema, {
-          name: className,
-          sourceModule: schemaExport.file,
-        });
+      ? convertZodToPydantic(schema, conversionOptions)
+      : convertZodToTypescript(schema, conversionOptions);
 
   return { path: outputPath, content };
 }

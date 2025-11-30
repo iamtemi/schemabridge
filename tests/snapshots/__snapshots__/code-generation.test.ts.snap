@@ -3,7 +3,29 @@
 exports[`Pydantic Code Generation Snapshots > generates consistent output for API request schema 1`] = `
 "from pydantic import BaseModel, Field, confloat, conint, constr
 from typing import Any, Literal, Optional, Union
+from enum import Enum
 from datetime import date
+
+class QueryFiltersStatusEnum(str, Enum):
+    ACTIVE = "active"
+    INACTIVE = "inactive"
+    PENDING = "pending"
+
+class QueryPaginationSortByEnum(str, Enum):
+    CREATED_AT = "created_at"
+    UPDATED_AT = "updated_at"
+    NAME = "name"
+
+class QueryPaginationSortOrderEnum(str, Enum):
+    ASC = "asc"
+    DESC = "desc"
+
+class MethodEnum(str, Enum):
+    GET = "GET"
+    POST = "POST"
+    PUT = "PUT"
+    PATCH = "PATCH"
+    DELETE = "DELETE"
 
 class ApiRequestSchema(BaseModel):
     class Headers(BaseModel):
@@ -13,7 +35,7 @@ class ApiRequestSchema(BaseModel):
         User_Agent: Optional[str] = Field(alias="User-Agent", default=None)
     class Query(BaseModel):
         class QueryFilters(BaseModel):
-            status: Optional[Literal["active", "inactive", "pending"]] = None
+            status: Optional[QueryFiltersStatusEnum] = None
             dateFrom: Optional[str] = None
             dateTo: Optional[str] = None
             minPrice: Optional[confloat(ge=0)] = None
@@ -21,8 +43,8 @@ class ApiRequestSchema(BaseModel):
         class QueryPagination(BaseModel):
             page: conint(ge=1) = Field(default=1)
             limit: conint(ge=1, le=100) = Field(default=20)
-            sortBy: Optional[Literal["created_at", "updated_at", "name"]] = None
-            sortOrder: Literal["asc", "desc"] = Field(default="desc")
+            sortBy: Optional[QueryPaginationSortByEnum] = None
+            sortOrder: QueryPaginationSortOrderEnum = Field(default="desc")
         search: Optional[str] = None
         filters: Optional[QueryFilters] = None
         pagination: Optional[QueryPagination] = None
@@ -53,8 +75,8 @@ class ApiRequestSchema(BaseModel):
             class ResponseMetaPagination(BaseModel):
                 page: conint(ge=1) = Field(default=1)
                 limit: conint(ge=1, le=100) = Field(default=20)
-                sortBy: Optional[Literal["created_at", "updated_at", "name"]] = None
-                sortOrder: Literal["asc", "desc"] = Field(default="desc")
+                sortBy: Optional[QueryPaginationSortByEnum] = None
+                sortOrder: QueryPaginationSortOrderEnum = Field(default="desc")
             requestId: str
             timestamp: date
             duration: confloat(ge=0)
@@ -63,7 +85,7 @@ class ApiRequestSchema(BaseModel):
         data: Optional[Any] = None
         error: Optional[ResponseError] = None
         meta: Optional[ResponseMeta] = None
-    method: Literal["GET", "POST", "PUT", "PATCH", "DELETE"]
+    method: MethodEnum
     path: str
     headers: Headers
     query: Optional[Query] = None
@@ -74,8 +96,19 @@ class ApiRequestSchema(BaseModel):
 exports[`Pydantic Code Generation Snapshots > generates consistent output for comprehensive schema 1`] = `
 "from pydantic import BaseModel, Field, confloat, conint, constr
 from typing import Any, List, Literal, Optional, Union
+from enum import Enum
 
 PHONE_REGEX = r"^\\+?[1-9]\\d{1,14}$"
+
+class SettingsThemeEnum(str, Enum):
+    LIGHT = "light"
+    DARK = "dark"
+
+class StatusEnum(str, Enum):
+    PENDING = "pending"
+    ACTIVE = "active"
+    INACTIVE = "inactive"
+    ARCHIVED = "archived"
 
 class ComprehensiveSchema(BaseModel):
     class ItemsItem(BaseModel):
@@ -97,7 +130,7 @@ class ComprehensiveSchema(BaseModel):
         key: str
         value: str
     class Settings(BaseModel):
-        theme: Literal["light", "dark"] = Field(default="light")
+        theme: SettingsThemeEnum = Field(default="light")
         notifications: bool = Field(default=True)
     class Config(BaseModel):
         pass
@@ -133,7 +166,7 @@ class ComprehensiveSchema(BaseModel):
     quantity: confloat(ge=0)
     isActive: bool
     verified: bool = Field(default=False)
-    status: Literal["pending", "active", "inactive", "archived"]
+    status: StatusEnum
     priority: Literal["high"]
     type: Union[Literal["user"], Literal["admin"], Literal["guest"]]
     tags: List[str]
@@ -155,7 +188,33 @@ class ComprehensiveSchema(BaseModel):
 
 exports[`Pydantic Code Generation Snapshots > generates consistent output for config schema 1`] = `
 "from pydantic import BaseModel, Field, conint, constr
-from typing import List, Literal, Optional
+from typing import List, Optional
+from enum import Enum
+
+class CacheTypeEnum(str, Enum):
+    MEMORY = "memory"
+    REDIS = "redis"
+    MEMCACHED = "memcached"
+
+class LoggingLevelEnum(str, Enum):
+    DEBUG = "debug"
+    INFO = "info"
+    WARN = "warn"
+    ERROR = "error"
+
+class LoggingFormatEnum(str, Enum):
+    JSON = "json"
+    TEXT = "text"
+
+class LoggingOutputEnum(str, Enum):
+    CONSOLE = "console"
+    FILE = "file"
+    BOTH = "both"
+
+class EnvEnum(str, Enum):
+    DEVELOPMENT = "development"
+    STAGING = "staging"
+    PRODUCTION = "production"
 
 class ConfigSchema(BaseModel):
     class Server(BaseModel):
@@ -183,7 +242,7 @@ class ConfigSchema(BaseModel):
             port: Optional[conint(ge=1, le=65535)] = None
             password: Optional[str] = None
         enabled: bool = Field(default=True)
-        type: Literal["memory", "redis", "memcached"] = Field(default="memory")
+        type: CacheTypeEnum = Field(default="memory")
         ttl: conint(ge=0) = Field(default=3600)
         redis: Optional[CacheRedis] = None
     class Logging(BaseModel):
@@ -191,9 +250,9 @@ class ConfigSchema(BaseModel):
             path: str = Field(default="./logs")
             maxSize: conint(gt=0) = Field(default=10485760)
             maxFiles: conint(gt=0) = Field(default=5)
-        level: Literal["debug", "info", "warn", "error"] = Field(default="info")
-        format: Literal["json", "text"] = Field(default="json")
-        output: Literal["console", "file", "both"] = Field(default="console")
+        level: LoggingLevelEnum = Field(default="info")
+        format: LoggingFormatEnum = Field(default="json")
+        output: LoggingOutputEnum = Field(default="console")
         file: Optional[LoggingFile] = None
     class Features(BaseModel):
         class FeaturesRateLimiting(BaseModel):
@@ -212,7 +271,7 @@ class ConfigSchema(BaseModel):
         strictMode: bool = Field(default=False)
         allowUnknownFields: bool = Field(default=False)
         maxDepth: conint(gt=0) = Field(default=10)
-    env: Literal["development", "staging", "production"] = Field(default="development")
+    env: EnvEnum = Field(default="development")
     debug: bool = Field(default=False)
     server: Server
     database: Database
@@ -225,16 +284,28 @@ class ConfigSchema(BaseModel):
 
 exports[`Pydantic Code Generation Snapshots > generates consistent output for database entity schema 1`] = `
 "from pydantic import BaseModel, Field, conint, constr
-from typing import List, Literal, Optional
+from typing import List, Optional
+from enum import Enum
 from datetime import date, datetime
 from uuid import UUID
 
 USERNAME_REGEX = r"^[a-zA-Z0-9_]+$"
 
+class MetadataPreferencesThemeEnum(str, Enum):
+    LIGHT = "light"
+    DARK = "dark"
+    AUTO = "auto"
+
+class StatusEnum(str, Enum):
+    ACTIVE = "active"
+    INACTIVE = "inactive"
+    SUSPENDED = "suspended"
+    PENDING_VERIFICATION = "pending_verification"
+
 class DatabaseEntitySchema(BaseModel):
     class Metadata(BaseModel):
         class MetadataPreferences(BaseModel):
-            theme: Literal["light", "dark", "auto"] = Field(default="auto")
+            theme: MetadataPreferencesThemeEnum = Field(default="auto")
             language: str = Field(default="en")
             notifications: bool = Field(default=True)
         last_login: Optional[str]
@@ -269,7 +340,7 @@ class DatabaseEntitySchema(BaseModel):
     email: str
     username: constr(min_length=3, max_length=50, pattern=USERNAME_REGEX)
     full_name: constr(min_length=1, max_length=200)
-    status: Literal["active", "inactive", "suspended", "pending_verification"]
+    status: StatusEnum
     organization_id: Optional[UUID]
     team_id: Optional[str] = None
     created_at: date
@@ -377,15 +448,48 @@ class EdgeCasesSchema(BaseModel):
 exports[`Pydantic Code Generation Snapshots > generates consistent output for event schema 1`] = `
 "from pydantic import BaseModel, Field, confloat, conint, constr
 from typing import Any, List, Literal, Optional, Union
+from enum import Enum
 from datetime import datetime
 from uuid import UUID
 
 VERSION_REGEX = r"^\\d+\\.\\d+\\.\\d+$"
 
+class PayloadOption0EventMetadataSourceEnum(str, Enum):
+    WEB = "web"
+    API = "api"
+    ADMIN = "admin"
+
+class PayloadOption2MethodEnum(str, Enum):
+    CREDIT_CARD = "credit_card"
+    PAYPAL = "paypal"
+    BANK_TRANSFER = "bank_transfer"
+
+class PayloadOption2StatusEnum(str, Enum):
+    SUCCESS = "success"
+    FAILED = "failed"
+    PENDING = "pending"
+
+class PayloadOption3ChannelEnum(str, Enum):
+    EMAIL = "email"
+    SMS = "sms"
+    PUSH = "push"
+    IN_APP = "in_app"
+
+class MetadataEnvironmentEnum(str, Enum):
+    DEVELOPMENT = "development"
+    STAGING = "staging"
+    PRODUCTION = "production"
+
+class EventTypeEnum(str, Enum):
+    USER_CREATED = "user_created"
+    ORDER_PLACED = "order_placed"
+    PAYMENT_PROCESSED = "payment_processed"
+    NOTIFICATION_SENT = "notification_sent"
+
 class EventSchema(BaseModel):
     class PayloadOption0(BaseModel):
         class PayloadOption0EventMetadata(BaseModel):
-            source: Literal["web", "api", "admin"]
+            source: PayloadOption0EventMetadataSourceEnum
             ipAddress: Optional[str] = None
         type: Literal["user_created"]
         userId: UUID
@@ -412,15 +516,15 @@ class EventSchema(BaseModel):
         paymentId: UUID
         orderId: UUID
         amount: confloat(gt=0)
-        method: Literal["credit_card", "paypal", "bank_transfer"]
-        status: Literal["success", "failed", "pending"]
+        method: PayloadOption2MethodEnum
+        status: PayloadOption2StatusEnum
         timestamp: datetime
         error: Optional[PayloadOption2Error] = None
     class PayloadOption3(BaseModel):
         type: Literal["notification_sent"]
         notificationId: UUID
         userId: UUID
-        channel: Literal["email", "sms", "push", "in_app"]
+        channel: PayloadOption3ChannelEnum
         template: str
         data: Any
         timestamp: datetime
@@ -434,8 +538,8 @@ class EventSchema(BaseModel):
         correlationId: Optional[UUID] = None
         causationId: Optional[UUID] = None
         tags: List[str] = Field(default_factory=list)
-        environment: Optional[Literal["development", "staging", "production"]] = None
-    eventType: Literal["user_created", "order_placed", "payment_processed", "notification_sent"]
+        environment: Optional[MetadataEnvironmentEnum] = None
+    eventType: EventTypeEnum
     payload: Union[PayloadOption0, PayloadOption1, PayloadOption2, PayloadOption3]
     id: UUID
     timestamp: datetime
