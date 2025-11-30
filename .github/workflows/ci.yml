@@ -42,14 +42,11 @@ jobs:
       - name: Format check
         run: pnpm format:check
 
-      - name: Run tests
-        run: pnpm test:coverage
-
       - name: Build
         run: pnpm build
 
-      - name: Test bundled CLI
-        run: pnpm test:unit tests/unit/bundled-cli.test.ts
+      - name: Run tests
+        run: pnpm test:coverage
 
       - name: Upload coverage to Codecov
         if: matrix.node-version == '22.x'
