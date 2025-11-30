@@ -29,6 +29,68 @@ describe('visitZodSchema', () => {
     expect(datetimeResult.node).toEqual({ type: 'datetime' });
   });
 
+  it('detects z.uuid() directly (Zod v4)', () => {
+    const result = visitZodSchema(z.uuid());
+    expect(result.node).toEqual({ type: 'uuid' });
+    expect(result.warnings).toHaveLength(0);
+  });
+
+  it('detects z.int() directly (Zod v4)', () => {
+    const result = visitZodSchema(z.int());
+    expect(result.node).toEqual({ type: 'int' });
+    expect(result.warnings).toHaveLength(0);
+  });
+
+  it('distinguishes z.date() from z.iso.date()', () => {
+    // z.date() validates Date objects
+    const dateResult = visitZodSchema(z.date());
+    expect(dateResult.node).toEqual({ type: 'date' });
+
+    // z.iso.date() validates ISO date strings
+    const isoDateResult = visitZodSchema(z.iso.date());
+    expect(isoDateResult.node).toEqual({ type: 'isodate' });
+  });
+
+  it('detects z.iso.datetime() correctly', () => {
+    const result = visitZodSchema(z.iso.datetime());
+    expect(result.node).toEqual({ type: 'datetime' });
+    expect(result.warnings).toHaveLength(0);
+  });
+
+  it('detects z.string().datetime() correctly', () => {
+    const result = visitZodSchema(z.string().datetime());
+    expect(result.node).toEqual({ type: 'datetime' });
+    expect(result.warnings).toHaveLength(0);
+  });
+
+  it('detects new Zod v4 string formats', () => {
+    expect(visitZodSchema(z.ipv4()).node).toEqual({ type: 'ipv4' });
+    expect(visitZodSchema(z.ipv6()).node).toEqual({ type: 'ipv6' });
+    expect(visitZodSchema(z.iso.time()).node).toEqual({ type: 'time' });
+    expect(visitZodSchema(z.iso.duration()).node).toEqual({ type: 'duration' });
+  });
+
+  it('handles all date/datetime variants in objects', () => {
+    const schema = z.object({
+      dateObj: z.date(), // Date object
+      isoDate: z.iso.date(), // ISO date string
+      isoDatetime: z.iso.datetime(), // ISO datetime string
+      stringDatetime: z.string().datetime(), // String datetime
+    });
+
+    const { node, warnings } = visitZodSchema(schema);
+    expect(warnings).toHaveLength(0);
+    expect(node).toEqual({
+      type: 'object',
+      fields: {
+        dateObj: { type: 'date' },
+        isoDate: { type: 'isodate' },
+        isoDatetime: { type: 'datetime' },
+        stringDatetime: { type: 'datetime' },
+      },
+    });
+  });
+
   it('captures number and int constraints', () => {
     const intResult = visitZodSchema(z.number().int().min(1).max(10));
     expect(intResult.node).toEqual({

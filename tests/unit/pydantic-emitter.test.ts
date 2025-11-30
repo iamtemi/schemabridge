@@ -71,6 +71,77 @@ describe('emitPydanticModel', () => {
     await assertValidPythonSyntax(code);
   });
 
+  it('handles z.uuid() directly (Zod v4)', async () => {
+    const schema = z.object({
+      id: z.uuid(),
+    });
+
+    const code = convertZodToPydantic(schema, { name: 'UuidTest' }).trim();
+
+    expect(code).toContain('from uuid import UUID');
+    expect(code).toContain('id: UUID');
+    await assertValidPythonSyntax(code);
+  });
+
+  it('handles z.int() directly (Zod v4)', async () => {
+    const schema = z.object({
+      count: z.int(),
+    });
+
+    const code = convertZodToPydantic(schema, { name: 'IntTest' }).trim();
+
+    expect(code).toContain('from pydantic import BaseModel, conint');
+    expect(code).toContain('count: conint()');
+    await assertValidPythonSyntax(code);
+  });
+
+  it('distinguishes z.date() from z.iso.date()', async () => {
+    const schema = z.object({
+      dateObj: z.date(),
+      isoDate: z.iso.date(),
+    });
+
+    const code = convertZodToPydantic(schema, { name: 'DateTest' }).trim();
+
+    expect(code).toContain('from datetime import date');
+    expect(code).toContain('dateObj: date');
+    expect(code).toContain('isoDate: date'); // Both map to Python date
+    await assertValidPythonSyntax(code);
+  });
+
+  it('handles z.iso.datetime() and z.string().datetime()', async () => {
+    const schema = z.object({
+      isoDatetime: z.iso.datetime(),
+      stringDatetime: z.string().datetime(),
+    });
+
+    const code = convertZodToPydantic(schema, { name: 'DatetimeTest' }).trim();
+
+    expect(code).toContain('from datetime import datetime');
+    expect(code).toContain('isoDatetime: datetime');
+    expect(code).toContain('stringDatetime: datetime');
+    await assertValidPythonSyntax(code);
+  });
+
+  it('handles new Zod v4 string formats', async () => {
+    const schema = z.object({
+      ipv4: z.ipv4(),
+      ipv6: z.ipv6(),
+      time: z.iso.time(),
+      duration: z.iso.duration(),
+    });
+
+    const code = convertZodToPydantic(schema, { name: 'FormatTest' }).trim();
+
+    expect(code).toContain('from ipaddress import IPv4Address, IPv6Address');
+    expect(code).toContain('from datetime import time, timedelta');
+    expect(code).toContain('ipv4: IPv4Address');
+    expect(code).toContain('ipv6: IPv6Address');
+    expect(code).toContain('time: time');
+    expect(code).toContain('duration: timedelta');
+    await assertValidPythonSyntax(code);
+  });
+
   it('renders unions, literals, and constrained numbers', async () => {
     const schema = z.object({
       status: z.enum(['pending', 'done']),

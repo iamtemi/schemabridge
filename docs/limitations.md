@@ -4,6 +4,24 @@ This document outlines current limitations in SchemaBridge and workarounds where
 
 ## Schema Type Limitations
 
+### Exported Schemas Only
+
+**Status:** ✅ Only exported schemas are scanned and converted.
+
+**Behavior:** SchemaBridge only processes schemas that are exported from files. Non-exported schemas are ignored.
+
+**Example:**
+
+```typescript
+// ✅ This will be converted
+export const userSchema = z.object({ id: z.string() });
+
+// ❌ This will be ignored
+const userSchema = z.object({ id: z.string() });
+```
+
+**Why:** Scanning non-exported schemas would require full AST parsing of TypeScript files, which is significantly more complex and error-prone than the current module-based approach. The export requirement also makes it clear which schemas are intended for external use.
+
 ### Enums
 
 **Status:** ✅ `z.enum()` schemas are now fully supported!

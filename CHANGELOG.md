@@ -11,6 +11,49 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Potential `export-name` filter flag for folder conversion
 - More examples and recipes
 
+## [0.3.0] – 2024-11-30
+
+### Added
+
+- **Universal Root Schema Support**: Any Zod schema type can now be converted as a root schema
+  - Objects (`z.object()`) → Pydantic models / TypeScript interfaces
+  - Enums (`z.enum()`) → Enum classes / union types
+  - Unions (`z.union()`) → Type aliases (`type Name = Union[...]`)
+  - Primitives (`z.string()`, `z.number()`, `z.ipv4()`, etc.) → Type aliases
+  - Arrays (`z.array()`) → Type aliases
+  - Previously only objects and enums were supported as root schemas
+- **Type Alias Generation**: Non-object schemas now generate type aliases instead of failing
+  - Pydantic: Uses Python 3.12+ `type` syntax (e.g., `type Ipv4 = IPv4Address`)
+  - TypeScript: Uses `export type` syntax (e.g., `export type Ipv4 = string`)
+- **Zod v4 Compatibility Improvements**:
+  - Fixed `z.uuid()` detection (now correctly generates `UUID` type in Python)
+  - Fixed `z.int()` detection (now correctly generates `int` type)
+  - Fixed `z.iso.date()` handling (now generates `date` in Python, `string` in TypeScript)
+  - Added support for `z.ipv4()`, `z.ipv6()`, `z.iso.time()`, `z.iso.duration()`
+- **Documentation**: Added explicit note that only exported schemas are scanned
+
+### Fixed
+
+- **Zod v4 String Formats**: `z.uuid()`, `z.iso.date()`, `z.iso.datetime()` now correctly detected in Zod v4
+- **Zod v4 Number Formats**: `z.int()` now correctly detected in Zod v4
+- **Type Generation**: Fixed incorrect type generation for ISO date/datetime formats
+  - `z.iso.date()` now correctly maps to Python `date` (Pydantic parses ISO strings) and TypeScript `string`
+  - `z.date()` vs `z.iso.date()` are now properly distinguished
+
+### Changed
+
+- **Root Schema Validation**: Removed restriction that only objects and enums could be root schemas
+- **Error Messages**: Improved error handling for non-object schemas (now generates type aliases instead of errors)
+- **Documentation**: Updated CLI docs with examples of all supported root schema types
+
+### Technical
+
+- Added `emitPydanticTypeAlias()` and `emitTypeScriptTypeAlias()` functions
+- Updated AST visitor to handle Zod v4 direct `check` property (not just `checks` array)
+- Added new `isodate` AST node type to distinguish `z.iso.date()` from `z.date()`
+- Added comprehensive tests for type alias generation (9 new test cases)
+- Updated test snapshots to reflect bug fixes and new features
+
 ## [0.2.0] – 2024-11-30
 
 ### Added

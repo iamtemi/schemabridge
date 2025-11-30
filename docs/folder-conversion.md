@@ -115,9 +115,22 @@ Schemas that reference each other in a circle can cause problems. Keep your sche
 
 ## What gets converted
 
-- All exported Zod schemas in files under `sourceDir`.
+- **Only exported Zod schemas** in files under `sourceDir`. Non-exported schemas (e.g., `const schema = z.object(...)`) are ignored.
 - Referenced schemas are inlined inside their parents; separate files are only created for exports.
 - Enums (`z.enum([...])`) become `Literal[...]` in Python and union types in `.d.ts`.
+
+::: tip Export your schemas
+To convert a schema, make sure it's exported:
+
+```typescript
+// ✅ This will be converted
+export const userSchema = z.object({ ... });
+
+// ❌ This will be ignored
+const userSchema = z.object({ ... });
+```
+
+:::
 
 ## Zod v4 tips
 

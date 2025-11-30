@@ -5,7 +5,7 @@
  *
  * This is NOT user code - users just run: schemabridge convert folder ...
  *
- * This script runs the actual bundled CLI (bin/schemabridge.js) with --flat and --init flags,
+ * This script runs the actual bundled CLI (bin/schemabridge.js) with and --init flags,
  * verifies the output, and optionally cleans up the generated files.
  *
  * Usage:
@@ -69,9 +69,9 @@ async function main() {
   await cleanup();
 
   try {
-    console.log('Running: schemabridge convert folder ... --to pydantic --flat --init\n');
+    console.log('Running: schemabridge convert folder ... --to pydantic --init\n');
 
-    const command = `node ${bundledCLI} convert folder ${sourceDir} --out ${outputDir} --to pydantic --flat --init`;
+    const command = `node ${bundledCLI} convert folder ${sourceDir} --out ${outputDir} --to pydantic --init`;
     console.log(`Command: ${command}\n`);
 
     execSync(command, {

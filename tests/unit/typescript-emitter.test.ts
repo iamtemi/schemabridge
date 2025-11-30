@@ -233,6 +233,60 @@ describe('emitTypeScriptDefinitions', () => {
     expect(code).toBe(['export interface UuidTest {', '  id: string;', '}'].join('\n'));
   });
 
+  it('handles z.uuid() directly (Zod v4)', () => {
+    const schema = z.object({
+      id: z.uuid(),
+    });
+
+    const code = convertZodToTypescript(schema, { name: 'UuidTest' }).trim();
+
+    assertValidTypeScriptSyntax(code);
+    expect(code).toBe(['export interface UuidTest {', '  id: string;', '}'].join('\n'));
+  });
+
+  it('distinguishes z.date() from z.iso.date() in TypeScript', () => {
+    const schema = z.object({
+      dateObj: z.date(),
+      isoDate: z.iso.date(),
+    });
+
+    const code = convertZodToTypescript(schema, { name: 'DateTest' }).trim();
+
+    assertValidTypeScriptSyntax(code);
+    expect(code).toContain('dateObj: Date');
+    expect(code).toContain('isoDate: string'); // z.iso.date() is a string format
+  });
+
+  it('handles z.iso.datetime() and z.string().datetime()', () => {
+    const schema = z.object({
+      isoDatetime: z.iso.datetime(),
+      stringDatetime: z.string().datetime(),
+    });
+
+    const code = convertZodToTypescript(schema, { name: 'DatetimeTest' }).trim();
+
+    assertValidTypeScriptSyntax(code);
+    expect(code).toContain('isoDatetime: string');
+    expect(code).toContain('stringDatetime: string');
+  });
+
+  it('handles new Zod v4 string formats as strings', () => {
+    const schema = z.object({
+      ipv4: z.ipv4(),
+      ipv6: z.ipv6(),
+      time: z.iso.time(),
+      duration: z.iso.duration(),
+    });
+
+    const code = convertZodToTypescript(schema, { name: 'FormatTest' }).trim();
+
+    assertValidTypeScriptSyntax(code);
+    expect(code).toContain('ipv4: string');
+    expect(code).toContain('ipv6: string');
+    expect(code).toContain('time: string');
+    expect(code).toContain('duration: string');
+  });
+
   it('handles int as number', () => {
     const schema = z.object({
       count: z.number().int(),

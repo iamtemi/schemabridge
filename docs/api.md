@@ -40,6 +40,8 @@ await generateFilesFromZod({
 
 Convert all schemas in a directory. Mirrors folder structure by default; one file per export (snake_case).
 
+**Note:** Only exported schemas are scanned. Non-exported schemas (e.g., `const schema = z.object(...)`) are ignored.
+
 ```typescript
 import { convertFolder } from 'schemabridge';
 
@@ -99,7 +101,17 @@ schemas.forEach((s) => {
 });
 ```
 
-## Enum Support
+## Root Schema Types
+
+SchemaBridge supports converting any Zod schema type as a root schema:
+
+- **Objects** (`z.object()`) → Pydantic models / TypeScript interfaces
+- **Enums** (`z.enum()`) → Enum classes / union types
+- **Unions** (`z.union()`) → Type aliases
+- **Primitives** (`z.string()`, `z.number()`, `z.ipv4()`, etc.) → Type aliases
+- **Arrays** (`z.array()`) → Type aliases
+
+### Enum Support
 
 Standalone enum exports and enum fields are fully supported:
 
@@ -126,6 +138,22 @@ status: Literal["active", "inactive", "suspended"]
 
 ```typescript
 export type StatusEnum = 'active' | 'inactive' | 'suspended';
+```
+
+### Type Alias Examples
+
+Non-object schemas generate type aliases:
+
+```typescript
+// Union
+export const dateTypes = z.union([z.date(), z.iso.date()]);
+// Pydantic: type DateTypes = Union[date, date]
+// TypeScript: export type DateTypes = Date | string
+
+// Primitive
+export const ipv4 = z.ipv4();
+// Pydantic: type Ipv4 = IPv4Address
+// TypeScript: export type Ipv4 = string
 ```
 
 ## Zod v4

@@ -5,6 +5,7 @@ exports[`Pydantic Code Generation Snapshots > generates consistent output for AP
 from typing import Any, Literal, Optional, Union
 from enum import Enum
 from datetime import date
+from uuid import UUID
 
 class QueryFiltersStatusEnum(str, Enum):
     ACTIVE = "active"
@@ -31,13 +32,13 @@ class ApiRequestSchema(BaseModel):
     class Headers(BaseModel):
         Content_Type: str = Field(alias="Content-Type", default=...)
         Authorization: Optional[str] = None
-        X_Request_ID: Optional[str] = Field(alias="X-Request-ID", default=None)
+        X_Request_ID: Optional[UUID] = Field(alias="X-Request-ID", default=None)
         User_Agent: Optional[str] = Field(alias="User-Agent", default=None)
     class Query(BaseModel):
         class QueryFilters(BaseModel):
             status: Optional[QueryFiltersStatusEnum] = None
-            dateFrom: Optional[str] = None
-            dateTo: Optional[str] = None
+            dateFrom: Optional[date] = None
+            dateTo: Optional[date] = None
             minPrice: Optional[confloat(ge=0)] = None
             maxPrice: Optional[confloat(ge=0)] = None
         class QueryPagination(BaseModel):
@@ -60,11 +61,11 @@ class ApiRequestSchema(BaseModel):
             name: Optional[constr(min_length=1)] = None
             email: Optional[str] = None
         type: Literal["update"]
-        id: str
+        id: UUID
         data: BodyOption1Data
     class BodyOption2(BaseModel):
         type: Literal["delete"]
-        id: str
+        id: UUID
         reason: Optional[str] = None
     class Response(BaseModel):
         class ResponseError(BaseModel):
@@ -77,7 +78,7 @@ class ApiRequestSchema(BaseModel):
                 limit: conint(ge=1, le=100) = Field(default=20)
                 sortBy: Optional[QueryPaginationSortByEnum] = None
                 sortOrder: QueryPaginationSortOrderEnum = Field(default="desc")
-            requestId: str
+            requestId: UUID
             timestamp: date
             duration: confloat(ge=0)
             pagination: Optional[ResponseMetaPagination] = None
@@ -97,6 +98,8 @@ exports[`Pydantic Code Generation Snapshots > generates consistent output for co
 "from pydantic import BaseModel, Field, confloat, conint, constr
 from typing import Any, List, Literal, Optional, Union
 from enum import Enum
+from datetime import date, datetime
+from uuid import UUID
 
 PHONE_REGEX = r"^\\+?[1-9]\\d{1,14}$"
 
@@ -156,9 +159,9 @@ class ComprehensiveSchema(BaseModel):
     name: constr(min_length=1, max_length=100)
     email: str
     phone: constr(pattern=PHONE_REGEX)
-    uuid: str
-    datetime: str
-    date: str
+    uuid: UUID
+    datetime: datetime
+    date: date
     age: conint(ge=0, le=150)
     score: confloat(gt=0)
     rating: confloat(ge=0, le=5)
@@ -308,18 +311,18 @@ class DatabaseEntitySchema(BaseModel):
             theme: MetadataPreferencesThemeEnum = Field(default="auto")
             language: str = Field(default="en")
             notifications: bool = Field(default=True)
-        last_login: Optional[str]
+        last_login: Optional[datetime]
         login_count: conint(ge=0) = Field(default=0)
         preferences: MetadataPreferences = Field(default_factory=dict)
     class Organization(BaseModel):
-        id: str
+        id: UUID
         name: str
         domain: Optional[str] = None
         created_at: date
-        updated_at: str
+        updated_at: date
         deleted_at: Optional[datetime]
     class RolesItem(BaseModel):
-        id: str
+        id: UUID
         name: str
         permissions: List[str]
         assigned_at: datetime
@@ -336,15 +339,15 @@ class DatabaseEntitySchema(BaseModel):
         avatar_url: Optional[str]
         location: Optional[ProfileLocation] = None
         social_links: Optional[ProfileSocialLinks] = None
-    id: str
+    id: UUID
     email: str
     username: constr(min_length=3, max_length=50, pattern=USERNAME_REGEX)
     full_name: constr(min_length=1, max_length=200)
     status: StatusEnum
     organization_id: Optional[UUID]
-    team_id: Optional[str] = None
+    team_id: Optional[UUID] = None
     created_at: date
-    updated_at: str
+    updated_at: date
     deleted_at: Optional[datetime]
     metadata: Optional[Metadata] = None
     organization: Optional[Organization] = None

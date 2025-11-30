@@ -13,8 +13,13 @@ export type SchemaNode =
   | { type: 'int'; constraints?: NumberConstraints }
   | { type: 'boolean' }
   | { type: 'date' }
+  | { type: 'isodate' }
   | { type: 'datetime' }
   | { type: 'uuid' }
+  | { type: 'ipv4' }
+  | { type: 'ipv6' }
+  | { type: 'time' }
+  | { type: 'duration' }
   | { type: 'enum'; values: readonly string[] }
   | { type: 'literal'; value: unknown }
   | { type: 'object'; fields: Record<string, SchemaNode> }
@@ -137,8 +142,12 @@ function walkSchema(schema: ZodType, path: string[], warnings: VisitorWarning[])
     case 'ZodString': {
       const { constraints, inferredType } = extractStringConstraints(defObj);
       if (inferredType === 'uuid') return { type: 'uuid' };
-      if (inferredType === 'date') return { type: 'date' };
+      if (inferredType === 'isodate') return { type: 'isodate' };
       if (inferredType === 'datetime') return { type: 'datetime' };
+      if (inferredType === 'ipv4') return { type: 'ipv4' };
+      if (inferredType === 'ipv6') return { type: 'ipv6' };
+      if (inferredType === 'time') return { type: 'time' };
+      if (inferredType === 'duration') return { type: 'duration' };
       return constraints ? { type: 'string', constraints } : { type: 'string' };
     }
     case 'number':
@@ -284,12 +293,21 @@ function normalizeTypeName(def: Record<string, unknown>): string | undefined {
 
 function extractStringConstraints(def: Record<string, unknown>): {
   constraints?: StringConstraints;
-  inferredType?: 'uuid' | 'date' | 'datetime';
+  inferredType?: 'uuid' | 'isodate' | 'datetime' | 'ipv4' | 'ipv6' | 'time' | 'duration';
 } {
   const checks = (def.checks as unknown[]) || [];
   const constraints: StringConstraints = {};
-  let inferredType: 'uuid' | 'date' | 'datetime' | undefined;
+  let inferredType:
+    | 'uuid'
+    | 'isodate'
+    | 'datetime'
+    | 'ipv4'
+    | 'ipv6'
+    | 'time'
+    | 'duration'
+    | undefined;
 
+  // Handle checks array (Zod 3 style)
   for (const check of checks) {
     const normalized = normalizeStringCheck(check);
     if (!normalized) continue;
@@ -313,15 +331,69 @@ function extractStringConstraints(def: Record<string, unknown>): {
       case 'datetime':
         inferredType = 'datetime';
         break;
-      case 'date':
-        inferredType = 'date';
+      case 'isodate':
+        inferredType = 'isodate';
         break;
+      case 'ipv4':
+        inferredType = 'ipv4';
+        break;
+      case 'ipv6':
+        inferredType = 'ipv6';
+        break;
+      case 'time':
+        inferredType = 'time';
+        break;
+      case 'duration':
+        inferredType = 'duration';
+        break;
+    }
+  }
+
+  // Handle direct check property (Zod 4 style, e.g., z.uuid())
+  if (checks.length === 0 && def.check) {
+    const normalized = normalizeStringCheck(def);
+    if (normalized) {
+      switch (normalized.kind) {
+        case 'uuid':
+          inferredType = 'uuid';
+          break;
+        case 'datetime':
+          inferredType = 'datetime';
+          break;
+        case 'isodate':
+          inferredType = 'isodate';
+          break;
+        case 'ipv4':
+          inferredType = 'ipv4';
+          break;
+        case 'ipv6':
+          inferredType = 'ipv6';
+          break;
+        case 'time':
+          inferredType = 'time';
+          break;
+        case 'duration':
+          inferredType = 'duration';
+          break;
+        case 'regex':
+          constraints.regex = normalized.regex;
+          break;
+        case 'min':
+          constraints.minLength = normalized.value;
+          break;
+        case 'max':
+          constraints.maxLength = normalized.value;
+          break;
+        case 'length':
+          constraints.length = normalized.value;
+          break;
+      }
     }
   }
 
   const result: {
     constraints?: StringConstraints;
-    inferredType?: 'uuid' | 'date' | 'datetime';
+    inferredType?: 'uuid' | 'isodate' | 'datetime' | 'ipv4' | 'ipv6' | 'time' | 'duration';
   } = {};
   if (Object.keys(constraints).length > 0) {
     result.constraints = constraints;
@@ -340,6 +412,7 @@ function extractNumberConstraints(def: Record<string, unknown>): {
   const constraints: NumberConstraints = {};
   let isInt = false;
 
+  // Handle checks array (Zod 3 style)
   for (const check of checks) {
     const normalized = normalizeNumberCheck(check);
     if (!normalized) continue;
@@ -369,6 +442,36 @@ function extractNumberConstraints(def: Record<string, unknown>): {
     }
   }
 
+  // Handle direct check property (Zod 4 style, e.g., z.int())
+  if (checks.length === 0 && def.check) {
+    const normalized = normalizeNumberCheck(def);
+    if (normalized) {
+      switch (normalized.kind) {
+        case 'int':
+          isInt = true;
+          break;
+        case 'min':
+          constraints.min = {
+            value: normalized.value,
+            inclusive: normalized.inclusive ?? true,
+          };
+          if (constraints.min.value === 0 && constraints.min.inclusive === false) {
+            constraints.positive = true;
+          }
+          if (constraints.min.value === 0 && constraints.min.inclusive === true) {
+            constraints.nonnegative = true;
+          }
+          break;
+        case 'max':
+          constraints.max = {
+            value: normalized.value,
+            inclusive: normalized.inclusive ?? true,
+          };
+          break;
+      }
+    }
+  }
+
   const result: {
     constraints?: NumberConstraints;
     isInt: boolean;
@@ -385,8 +488,12 @@ type NormalizedStringCheck =
   | { kind: 'length'; value: number }
   | { kind: 'regex'; regex: RegExp | string }
   | { kind: 'uuid' }
-  | { kind: 'date' }
-  | { kind: 'datetime' };
+  | { kind: 'isodate' }
+  | { kind: 'datetime' }
+  | { kind: 'ipv4' }
+  | { kind: 'ipv6' }
+  | { kind: 'time' }
+  | { kind: 'duration' };
 
 function normalizeStringCheck(raw: unknown): NormalizedStringCheck | null {
   if (!raw || typeof raw !== 'object') return null;
@@ -407,8 +514,32 @@ function normalizeStringCheck(raw: unknown): NormalizedStringCheck | null {
       case 'datetime':
         return { kind: 'datetime' };
       case 'date':
-        return { kind: 'date' };
+        return { kind: 'isodate' };
+      case 'ipv4':
+        return { kind: 'ipv4' };
+      case 'ipv6':
+        return { kind: 'ipv6' };
+      case 'time':
+        return { kind: 'time' };
+      case 'duration':
+        return { kind: 'duration' };
     }
+  }
+
+  // Check if raw itself is a def object (Zod 4 style, e.g., z.uuid())
+  const directCheck = (raw as { check?: string; format?: string; pattern?: RegExp | string }).check;
+  if (directCheck === 'string_format') {
+    const format = (raw as { format?: string; pattern?: RegExp | string }).format;
+    if (format === 'regex' && (raw as { pattern?: RegExp | string }).pattern) {
+      return { kind: 'regex', regex: (raw as { pattern: RegExp | string }).pattern };
+    }
+    if (format === 'uuid') return { kind: 'uuid' };
+    if (format === 'datetime') return { kind: 'datetime' };
+    if (format === 'date') return { kind: 'isodate' };
+    if (format === 'ipv4') return { kind: 'ipv4' };
+    if (format === 'ipv6') return { kind: 'ipv6' };
+    if (format === 'time') return { kind: 'time' };
+    if (format === 'duration') return { kind: 'duration' };
   }
 
   const def =
@@ -432,7 +563,11 @@ function normalizeStringCheck(raw: unknown): NormalizedStringCheck | null {
       }
       if (format === 'uuid') return { kind: 'uuid' };
       if (format === 'datetime') return { kind: 'datetime' };
-      if (format === 'date') return { kind: 'date' };
+      if (format === 'date') return { kind: 'isodate' };
+      if (format === 'ipv4') return { kind: 'ipv4' };
+      if (format === 'ipv6') return { kind: 'ipv6' };
+      if (format === 'time') return { kind: 'time' };
+      if (format === 'duration') return { kind: 'duration' };
       return null;
     }
     default:
@@ -471,6 +606,31 @@ function normalizeNumberCheck(raw: unknown): NormalizedNumberCheck | null {
         return { kind: 'min', value: 0, inclusive: false };
       case 'nonnegative':
         return { kind: 'min', value: 0, inclusive: true };
+    }
+  }
+
+  // Check if raw itself is a def object (Zod 4 style, e.g., z.int())
+  const directCheck = (
+    raw as { check?: string; format?: string; value?: number; inclusive?: boolean }
+  ).check;
+  if (directCheck === 'number_format') {
+    const format = (raw as { format?: string }).format;
+    if (format === 'int' || format === 'safeint') {
+      return { kind: 'int' };
+    }
+  }
+  if (directCheck === 'greater_than') {
+    const value = (raw as { value?: number; inclusive?: boolean }).value;
+    const inclusive = (raw as { inclusive?: boolean }).inclusive;
+    if (value !== undefined) {
+      return { kind: 'min', value, inclusive: inclusive ?? false };
+    }
+  }
+  if (directCheck === 'less_than') {
+    const value = (raw as { value?: number; inclusive?: boolean }).value;
+    const inclusive = (raw as { inclusive?: boolean }).inclusive;
+    if (value !== undefined) {
+      return { kind: 'max', value, inclusive: inclusive ?? false };
     }
   }
 

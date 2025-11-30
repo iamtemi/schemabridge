@@ -12,6 +12,10 @@ interface EmitContext {
   needsUUID: boolean;
   needsDate: boolean;
   needsDatetime: boolean;
+  needsTime: boolean;
+  needsTimedelta: boolean;
+  needsIPv4: boolean;
+  needsIPv6: boolean;
   regexConstants: Map<string, string>;
   regexOrder: string[];
   warnings: VisitorWarning[];
@@ -42,6 +46,10 @@ export function emitPydanticModel(root: SchemaNode, options: EmitPydanticOptions
     needsUUID: false,
     needsDate: false,
     needsDatetime: false,
+    needsTime: false,
+    needsTimedelta: false,
+    needsIPv4: false,
+    needsIPv6: false,
     regexConstants: new Map(),
     regexOrder: [],
     warnings: options.warnings ?? [],
@@ -87,6 +95,42 @@ export function emitPydanticEnum(root: SchemaNode, options: EmitPydanticOptions)
   const enumClass = renderEnumClass(enumName, root.values, options.enumBaseType ?? 'str');
 
   return ['from enum import Enum', '', enumClass].join('\n');
+}
+
+/**
+ * Convert a non-object SchemaNode into a Python type alias.
+ * Supports: string, number, union, array, etc.
+ * Uses Python 3.12+ type alias syntax: `type TypeName = ...`
+ */
+export function emitPydanticTypeAlias(root: SchemaNode, options: EmitPydanticOptions): string {
+  const ctx: EmitContext = {
+    typingImports: new Set(),
+    pydanticImports: new Set(),
+    needsUUID: false,
+    needsDate: false,
+    needsDatetime: false,
+    needsTime: false,
+    needsTimedelta: false,
+    needsIPv4: false,
+    needsIPv6: false,
+    regexConstants: new Map(),
+    regexOrder: [],
+    enumClasses: new Map(),
+    enumClassesToRender: [],
+    warnings: options.warnings ?? [],
+    renderedPaths: new Set(),
+    pathNameMap: new Map(),
+    nameCounts: new Map(),
+    enumStyle: options.enumStyle ?? 'enum',
+    enumBaseType: options.enumBaseType ?? 'str',
+  };
+
+  const typeName = toPascalCase(options.name);
+  const annotation = buildAnnotation(root, ctx, [], typeName);
+  const importLines = buildImports(ctx);
+
+  const sections = [importLines, `type ${typeName} = ${annotation.annotation}`].filter(Boolean);
+  return sections.join('\n\n');
 }
 
 function renderObject(
@@ -257,6 +301,11 @@ function buildType(
       ctx.needsDate = true;
       return { annotation: 'date' };
 
+    case 'isodate':
+      // z.iso.date() - string format that Pydantic parses to date
+      ctx.needsDate = true;
+      return { annotation: 'date' };
+
     case 'datetime':
       ctx.needsDatetime = true;
       return { annotation: 'datetime' };
@@ -264,6 +313,22 @@ function buildType(
     case 'uuid':
       ctx.needsUUID = true;
       return { annotation: 'UUID' };
+
+    case 'ipv4':
+      ctx.needsIPv4 = true;
+      return { annotation: 'IPv4Address' };
+
+    case 'ipv6':
+      ctx.needsIPv6 = true;
+      return { annotation: 'IPv6Address' };
+
+    case 'time':
+      ctx.needsTime = true;
+      return { annotation: 'time' };
+
+    case 'duration':
+      ctx.needsTimedelta = true;
+      return { annotation: 'timedelta' };
 
     case 'enum': {
       if (ctx.enumStyle === 'literal') {
@@ -520,12 +585,21 @@ function buildImports(ctx: EmitContext): string {
   const dateImports = [];
   if (ctx.needsDate) dateImports.push('date');
   if (ctx.needsDatetime) dateImports.push('datetime');
+  if (ctx.needsTime) dateImports.push('time');
+  if (ctx.needsTimedelta) dateImports.push('timedelta');
   if (dateImports.length) {
     lines.push(`from datetime import ${dateImports.join(', ')}`);
   }
 
   if (ctx.needsUUID) {
     lines.push('from uuid import UUID');
+  }
+
+  const ipImports = [];
+  if (ctx.needsIPv4) ipImports.push('IPv4Address');
+  if (ctx.needsIPv6) ipImports.push('IPv6Address');
+  if (ipImports.length) {
+    lines.push(`from ipaddress import ${ipImports.join(', ')}`);
   }
 
   return lines.join('\n');

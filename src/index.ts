@@ -7,8 +7,16 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import type { ZodType } from 'zod';
-import { emitPydanticModel, emitPydanticEnum } from './core/emitters/pydantic.js';
-import { emitTypeScriptDefinitions, emitTypeScriptEnum } from './core/emitters/typescript.js';
+import {
+  emitPydanticModel,
+  emitPydanticEnum,
+  emitPydanticTypeAlias,
+} from './core/emitters/pydantic.js';
+import {
+  emitTypeScriptDefinitions,
+  emitTypeScriptEnum,
+  emitTypeScriptTypeAlias,
+} from './core/emitters/typescript.js';
 import { visitZodSchema } from './core/ast/zod-visitor.js';
 export { loadZodSchema, SchemaLoadError } from './core/loader/index.js';
 export {
@@ -103,11 +111,12 @@ export function convertZodToPydantic(schema: ZodType, options: SchemaConversionO
     return emitPydanticEnum(node, emitOptions);
   }
 
-  if (node.type !== 'object') {
-    throw new Error('Root schema must be a Zod object or enum to generate Pydantic models.');
+  if (node.type === 'object') {
+    return emitPydanticModel(node, emitOptions);
   }
 
-  return emitPydanticModel(node, emitOptions);
+  // Support type aliases for non-object schemas (e.g., z.ipv4(), z.union(), etc.)
+  return emitPydanticTypeAlias(node, emitOptions);
 }
 
 /**
@@ -138,11 +147,12 @@ export function convertZodToTypescript(schema: ZodType, options: SchemaConversio
     return emitTypeScriptEnum(node, emitOptions);
   }
 
-  if (node.type !== 'object') {
-    throw new Error('Root schema must be a Zod object or enum to generate TypeScript definitions.');
+  if (node.type === 'object') {
+    return emitTypeScriptDefinitions(node, emitOptions);
   }
 
-  return emitTypeScriptDefinitions(node, emitOptions);
+  // Support type aliases for non-object schemas (e.g., z.ipv4(), z.union(), etc.)
+  return emitTypeScriptTypeAlias(node, emitOptions);
 }
 
 export interface GenerateFilesFromZodOptions extends SchemaConversionOptions {

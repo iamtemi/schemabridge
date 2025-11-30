@@ -64,6 +64,24 @@ export function emitTypeScriptEnum(root: SchemaNode, options: EmitTypeScriptOpti
   return `export type ${typeName} = ${unionType};`;
 }
 
+/**
+ * Convert a non-object SchemaNode into a TypeScript type alias.
+ * Supports: string, number, union, array, etc.
+ */
+export function emitTypeScriptTypeAlias(root: SchemaNode, options: EmitTypeScriptOptions): string {
+  const ctx: EmitContext = {
+    renderedPaths: new Set(),
+    warnings: options.warnings ?? [],
+    exportNameOverrides: new Map(Object.entries(options.exportNameOverrides ?? {})),
+    pathNameMap: new Map(),
+    nameCounts: new Map(),
+  };
+
+  const typeName = toPascalCase(options.name);
+  const typeAnnotation = buildTypeAnnotation(root, ctx, [], typeName, false);
+  return `export type ${typeName} = ${typeAnnotation.typeAnnotation};`;
+}
+
 function renderInterface(
   node: SchemaNode,
   interfaceName: string,
@@ -215,10 +233,26 @@ function buildBaseType(
     case 'date':
       return 'Date';
 
+    case 'isodate':
+      // z.iso.date() - string format, not Date object
+      return 'string';
+
     case 'datetime':
       return 'string';
 
     case 'uuid':
+      return 'string';
+
+    case 'ipv4':
+      return 'string';
+
+    case 'ipv6':
+      return 'string';
+
+    case 'time':
+      return 'string';
+
+    case 'duration':
       return 'string';
 
     case 'enum': {
