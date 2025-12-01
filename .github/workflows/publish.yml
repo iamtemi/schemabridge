@@ -116,6 +116,23 @@ jobs:
         with:
           name: npm-package
 
+      - name: Debug - List downloaded files
+        run: |
+          echo "=== Current directory ==="
+          pwd
+          echo "=== File structure ==="
+          ls -la
+          echo "=== Looking for package.json ==="
+          find . -name "package.json" -type f
+          echo "=== Content check ==="
+          if [ -f "package.json" ]; then
+            echo "package.json found in root"
+          elif [ -f "packages/core/package.json" ]; then
+            echo "package.json found in packages/core/"
+          else
+            echo "package.json not found!"
+          fi
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -128,7 +145,6 @@ jobs:
           npm --version
 
       - name: Update package name for npm
-        working-directory: packages/core
         run: |
           # Change package name to schemabridge for npm (works with any current name)
           node -e "const pkg = require('./package.json'); pkg.name = 'schemabridge'; require('fs').writeFileSync('package.json', JSON.stringify(pkg, null, 2));"
