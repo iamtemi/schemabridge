@@ -1,0 +1,57 @@
+---
+title: What is SchemaBridge?
+---
+
+One tool to keep your TypeScript Zod schemas and Python models in sync. Define your schemas once in Zod; SchemaBridge generates Pydantic models and `.d.ts` types for you.
+
+## Why it exists
+
+Copying schemas between TypeScript and Python leads to drift and bugs.
+I hit this in TypeScript-first projects that later added Python services. JSON Schema detours and hand-ported models never stayed in sync. SchemaBridge removes the manual work so both sides stay aligned.
+
+## The idea in 10 seconds
+
+- You define Zod schemas.
+- SchemaBridge turns them into Pydantic models (and optional `.d.ts` files).
+- Use it from the CLI, in build scripts, or over a whole folder.
+
+## Tiny example
+
+**Input (TypeScript, Zod v4):**
+
+```typescript
+import { z } from 'zod';
+
+export const userSchema = z.object({
+  id: z.string().uuid(),
+  name: z.string(),
+  email: z.string().email(),
+  birthdate: z.date().optional(),
+  role: z.enum(['admin', 'viewer']),
+});
+```
+
+**Output (Python, Pydantic v2):**
+
+```python
+from pydantic import BaseModel
+from typing import Literal, Optional
+from uuid import UUID
+
+class UserSchema(BaseModel):
+    id: UUID
+    name: str
+    email: str
+    birthdate: Optional[date] = None
+    role: Literal["admin", "viewer"]
+```
+
+## What you can do
+
+- **Convert one schema**: `schemabridge convert zod schema.ts --export userSchema --to pydantic`
+- **Convert a folder**: `schemabridge convert folder ./src/schemas --out ./generated --to pydantic --init`
+- **Automate**: Call the Node API in your build to keep models in sync.
+
+## Ready to try?
+
+Start here: [Getting Started →](/getting-started)

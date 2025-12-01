@@ -1,0 +1,82 @@
+---
+title: SchemaBridge
+description: Keep your TypeScript Zod schemas and Python models in sync.
+template: splash
+hero:
+  tagline: One source of truth for your schemas.
+  image:
+    file: ../../assets/hand.webp
+  actions:
+    - text: Read the docs
+      link: /getting-started
+      icon: open-book
+    - text: Try the playground
+      link: /playground
+      icon: right-arrow
+      variant: primary
+---
+
+import { Card, CardGrid } from '@astrojs/starlight/components';
+
+## What is SchemaBridge?
+
+SchemaBridge is a **cross‑language schema generator**.
+You define your data models once with [Zod](https://zod.dev/) in TypeScript, and SchemaBridge generates:
+
+- **Python Pydantic models** for your backend.
+- **TypeScript `.d.ts` types** to keep the rest of your TS code in sync.
+
+That means a single source of truth for validation, types, and runtime models—no more hand‑maintained copies.
+
+## Tiny example
+
+<CardGrid>
+<Card title="Input (TypeScript, Zod)" icon="seti:typescript">
+
+```ts
+import { z } from 'zod';
+
+export const userSchema = z.object({
+  id: z.string().uuid(),
+  email: z.string().email(),
+  createdAt: z.date(),
+});
+```
+
+</Card>
+
+<Card title="Output (Python, Pydantic)" icon="seti:python">
+
+```python
+from pydantic import BaseModel
+from uuid import UUID
+from datetime import datetime
+
+
+class UserSchema(BaseModel):
+    id: UUID
+    email: str
+    createdAt: datetime
+```
+
+</Card>
+</CardGrid>
+
+## How you use it
+
+- **CLI** – convert a single schema or an entire folder:
+
+```bash
+schemabridge convert zod schema.ts --export userSchema --to pydantic --out user.py
+
+schemabridge convert folder ./src/schemas --out ./generated --to pydantic --init
+```
+
+- **Node API** – call SchemaBridge from build scripts and tooling.
+- **Playground** – paste a schema and see the generated code side‑by‑side.
+
+## Where to go next
+
+- Start with **[Getting Started](/getting-started)** to install and run your first conversion.
+- Browse the **[API Reference](/api)** if you want to embed SchemaBridge in your own tools.
+- Open the **[Playground](/playground)** to experiment with schemas and see the output live.
