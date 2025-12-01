@@ -7,9 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-- Documentation site (VitePress) drafts
-- Potential `export-name` filter flag for folder conversion
 - More examples and recipes
+
+## [0.3.1] – 2025-12-01
+
+### Added
+
+- Better Python package support when using folder conversion with `--init` / `generateInitFiles` (Pydantic targets only):
+  - `__init__.py` files created by earlier versions are now populated with imports for every generated model.
+  - Parent packages re-export models from child folders so imports feel natural.
+  - `__all__` is set for each package so `from generated import ...` and wildcard imports behave as expected.
 
 ## [0.3.0] – 2024-11-30
 

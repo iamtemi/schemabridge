@@ -68,6 +68,8 @@ export async function convertFolder(options: ConvertFolderOptions): Promise<Conv
   const allWarnings = [...scanResult.warnings];
   const allSkipped = [...scanResult.skippedFiles];
   const convertedFiles: ConvertedFile[] = [];
+  const pythonModuleMap: Map<string, PythonModuleEntry[]> | null =
+    generateInitFiles && (target === 'pydantic' || target === 'all') ? new Map() : null;
 
   // Deduplicate schemas by export name (handle re-exports)
   // Keep the first occurrence (original file, not re-export)
@@ -162,15 +164,13 @@ export async function convertFolder(options: ConvertFolderOptions): Promise<Conv
           if (!createdDirs.has(outputDir)) {
             await fs.mkdir(outputDir, { recursive: true });
             createdDirs.add(outputDir);
-
-            // Generate __init__.py if requested and target is pydantic
-            if (generateInitFiles && t === 'pydantic') {
-              const initPath = path.join(outputDir, '__init__.py');
-              await fs.writeFile(initPath, '', 'utf8');
-            }
           }
 
           await fs.writeFile(outputPath, output.content, 'utf8');
+
+          if (pythonModuleMap && t === 'pydantic') {
+            recordPythonModule(pythonModuleMap, outputPath, output.symbolName);
+          }
 
           convertedFiles.push({
             path: outputPath,
@@ -188,15 +188,8 @@ export async function convertFolder(options: ConvertFolderOptions): Promise<Conv
     }
   }
 
-  // Generate root __init__.py if requested (for both flat and structured)
-  if (generateInitFiles && (target === 'pydantic' || target === 'all')) {
-    const rootInitPath = path.join(resolvedOutDir, '__init__.py');
-    // Only create if it doesn't already exist (might have been created above)
-    try {
-      await fs.access(rootInitPath);
-    } catch {
-      await fs.writeFile(rootInitPath, '', 'utf8');
-    }
+  if (pythonModuleMap) {
+    await writeInitFiles(resolvedOutDir, pythonModuleMap);
   }
 
   return {
@@ -218,7 +211,7 @@ function convertSchema(
     enumStyle?: 'enum' | 'literal';
     enumBaseType?: 'str' | 'int';
   },
-): { path: string; content: string } {
+): { path: string; content: string; symbolName: string } {
   const { schema, exportName } = schemaExport;
   const { preserveStructure, outputBasePath, outDir, usedNames, enumStyle, enumBaseType } = options;
 
@@ -267,7 +260,164 @@ function convertSchema(
       ? convertZodToPydantic(schema, conversionOptions)
       : convertZodToTypescript(schema, conversionOptions);
 
-  return { path: outputPath, content };
+  return { path: outputPath, content, symbolName: className };
+}
+
+interface PythonModuleEntry {
+  moduleName: string;
+  symbolNames: string[];
+}
+
+interface PackageNode {
+  path: string;
+  modules: PythonModuleEntry[];
+  children: Set<PackageNode>;
+}
+
+function recordPythonModule(
+  modulesByDir: Map<string, PythonModuleEntry[]>,
+  filePath: string,
+  symbolName: string,
+): void {
+  const dirPath = path.dirname(filePath);
+  const moduleName = path.basename(filePath, path.extname(filePath));
+  const entries = modulesByDir.get(dirPath) ?? [];
+  entries.push({ moduleName, symbolNames: [symbolName] });
+  modulesByDir.set(dirPath, entries);
+}
+
+async function writeInitFiles(
+  rootDir: string,
+  modulesByDir: Map<string, PythonModuleEntry[]>,
+): Promise<void> {
+  const dirPaths = buildDirSet(rootDir, modulesByDir);
+  if (!dirPaths.has(rootDir)) {
+    dirPaths.add(rootDir);
+  }
+
+  const nodes = createPackageNodes(rootDir, dirPaths, modulesByDir);
+  const rootNode = nodes.get(rootDir);
+  if (!rootNode) return;
+
+  const fileContents = new Map<string, string>();
+
+  const traverse = (node: PackageNode): string[] => {
+    const lines: string[] = [];
+    const exportedSymbols: string[] = [];
+
+    const moduleEntries = [...node.modules].sort((a, b) =>
+      a.moduleName.localeCompare(b.moduleName),
+    );
+    for (const entry of moduleEntries) {
+      const joinedSymbols = entry.symbolNames.join(', ');
+      lines.push(`from .${entry.moduleName} import ${joinedSymbols}`);
+      exportedSymbols.push(...entry.symbolNames);
+    }
+
+    const childEntries = [...node.children].sort((a, b) =>
+      path.basename(a.path).localeCompare(path.basename(b.path)),
+    );
+    for (const child of childEntries) {
+      const childExports = traverse(child);
+      if (childExports.length === 0) {
+        continue;
+      }
+      const childName = path.basename(child.path);
+      lines.push(`from .${childName} import ${childExports.join(', ')}`);
+      exportedSymbols.push(...childExports);
+    }
+
+    const orderedExports: string[] = [];
+    const seen = new Set<string>();
+    for (const symbol of exportedSymbols) {
+      if (seen.has(symbol)) continue;
+      seen.add(symbol);
+      orderedExports.push(symbol);
+    }
+
+    let content = '';
+    if (lines.length > 0) {
+      content += `${lines.join('\n')}\n\n`;
+    }
+    if (orderedExports.length > 0) {
+      const quoted = orderedExports.map((symbol) => `"${symbol}"`).join(', ');
+      content += `__all__ = [${quoted}]\n`;
+    }
+
+    fileContents.set(node.path, content);
+    return orderedExports;
+  };
+
+  traverse(rootNode);
+
+  for (const [dirPath, content] of fileContents.entries()) {
+    const initPath = path.join(dirPath, '__init__.py');
+    await fs.writeFile(initPath, content, 'utf8');
+  }
+}
+
+function buildDirSet(rootDir: string, modulesByDir: Map<string, PythonModuleEntry[]>): Set<string> {
+  const dirPaths = new Set<string>();
+  for (const dirPath of modulesByDir.keys()) {
+    dirPaths.add(dirPath);
+    let current = dirPath;
+    while (true) {
+      const parent = getParentWithinRoot(current, rootDir);
+      if (!parent) break;
+      if (dirPaths.has(parent)) {
+        current = parent;
+        continue;
+      }
+      dirPaths.add(parent);
+      current = parent;
+    }
+  }
+  return dirPaths;
+}
+
+function createPackageNodes(
+  rootDir: string,
+  dirPaths: Set<string>,
+  modulesByDir: Map<string, PythonModuleEntry[]>,
+): Map<string, PackageNode> {
+  const nodes = new Map<string, PackageNode>();
+
+  const ensureNode = (dirPath: string): PackageNode => {
+    let node = nodes.get(dirPath);
+    if (!node) {
+      node = {
+        path: dirPath,
+        modules: modulesByDir.get(dirPath) ?? [],
+        children: new Set<PackageNode>(),
+      };
+      nodes.set(dirPath, node);
+    }
+    return node;
+  };
+
+  for (const dirPath of dirPaths) {
+    ensureNode(dirPath);
+  }
+
+  for (const dirPath of dirPaths) {
+    const parent = getParentWithinRoot(dirPath, rootDir);
+    if (!parent) continue;
+    const parentNode = ensureNode(parent);
+    const childNode = ensureNode(dirPath);
+    if (parentNode !== childNode) {
+      parentNode.children.add(childNode);
+    }
+  }
+
+  return nodes;
+}
+
+function getParentWithinRoot(dirPath: string, rootDir: string): string | null {
+  if (dirPath === rootDir) return null;
+  const parent = path.dirname(dirPath);
+  if (!parent || parent === dirPath) return null;
+  if (!parent.startsWith(rootDir)) return null;
+  return parent;
 }
 
 function toPascalCase(str: string): string {

@@ -75,6 +75,8 @@ generated/
     └── types.py
 ```
 
+Each generated `__init__.py` imports every model in that directory and re-exports anything from child packages, so the package tree behaves like a normal Python package. This behavior only applies when generating Pydantic outputs (`--to pydantic` or `--to all`); for TypeScript‑only runs, `--init` / `generateInitFiles` is ignored.
+
 Now you can import like this:
 
 ```python
@@ -117,7 +119,7 @@ Schemas that reference each other in a circle can cause problems. Keep your sche
 
 - **Only exported Zod schemas** in files under `sourceDir`. Non-exported schemas (e.g., `const schema = z.object(...)`) are ignored.
 - Referenced schemas are inlined inside their parents; separate files are only created for exports.
-- Enums (`z.enum([...])`) become `Literal[...]` in Python and union types in `.d.ts`.
+- Enums (`z.enum([...])`) become Enum classes in Python and union types in `.d.ts` by default. Use the enum options if you prefer plain literal types instead.
 
 ::: tip Export your schemas
 To convert a schema, make sure it's exported:

@@ -60,7 +60,7 @@ const result = await convertFolder({
 - `outDir` - Where to write converted files
 - `target` - `'pydantic'`, `'typescript'`, or `'all'`
 - `preserveStructure` - Keep folder structure (default: `true`)
-- `generateInitFiles` - Create `__init__.py` files (default: `false`)
+- `generateInitFiles` - For Pydantic targets (`target: 'pydantic'` or `'all'`), create and populate `__init__.py` files with imports for every generated model (default: `false`; ignored for TypeScript‑only runs)
 - `allowUnresolved` - Continue if imports fail (default: `false`)
 - `exportNamePattern` - Filter exports by glob (e.g. `*Schema`)
 - `tsconfigPath` - Custom tsconfig for path resolution (tsx still reads from CWD)

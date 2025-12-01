@@ -65,7 +65,7 @@ schemabridge convert folder ./src/schemas \
 - Scans `./src/schemas` recursively
 - Converts all exported Zod schemas
 - Mirrors folder structure
-- Adds `__init__.py` so you can `from generated.user import UserSchema`
+- Adds populated `__init__.py` files (imports + `__all__`) so you can `from generated import UserSchema` or `from generated.user import UserSchema`
 - Use `--flat` to dump everything into a single directory
 
 ## Python usage
@@ -83,20 +83,18 @@ The Python CLI wraps the bundled Node CLI and supports the same commands and fla
 
 ## Features
 
-- ✅ **Zod → Pydantic v2** – Generate Python models with full type support
-- ✅ **Zod → TypeScript** – Generate `.d.ts` type definitions
-- ✅ **Folder conversion** – Convert entire directories recursively
-- ✅ **Multiple schemas per file** – Automatically detects all exported schemas
-- ✅ **Dependency handling** – Resolves imports; exported schemas get their own files, referenced schemas are inlined into parents
-- ✅ **Python package ready** – Optional `--init` to build Python packages
-- ✅ **Flexible output** – Preserve structure or flatten to a single directory
+- ✅ **Python + TypeScript from one schema** – Zod in, Pydantic and `.d.ts` out
+- ✅ **Enum support built in** – Enums work out of the box in both Python and TypeScript
+- ✅ **Folder conversion** – Convert whole folders, not just single files
+- ✅ **Multiple schemas per file** – Finds every exported schema for you
+- ✅ **Python package mode** – `--init` builds import‑friendly Python packages
+- ✅ **Flexible output** – Keep your folder structure or flatten everything into one folder
 
-## Limitations (v1)
+## Limitations
 
-- `z.enum()` values are not emitted as standalone Pydantic enums
-- Only **exported** schemas get their own files; referenced schemas are inlined
+- Only **exported** schemas are converted; non‑exported helpers are ignored
 - Circular schema dependencies are not supported
-- TypeScript path aliases require running from a directory where `tsconfig.json` can be discovered
+- TypeScript path aliases need to be discoverable from the working directory
 
 ## Contributing
 
