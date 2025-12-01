@@ -7,6 +7,7 @@
     "lint": "pnpm -r lint",
     "format": "pnpm --filter @schemabridge/core format",
     "format:check": "pnpm --filter @schemabridge/core format:check",
+    "test:coverage": "pnpm --filter @schemabridge/core test:coverage",
     "typecheck": "pnpm -r typecheck",
     "docs:dev": "pnpm --filter @schemabridge/docs dev",
     "docs:build": "pnpm --filter @schemabridge/docs build",
