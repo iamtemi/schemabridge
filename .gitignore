@@ -45,8 +45,9 @@ dist/
 downloads/
 eggs/
 .eggs/
-lib/
-lib64/
+# Only ignore top-level Python build libs, not app source libs under packages/**
+/lib/
+/lib64/
 parts/
 sdist/
 var/
@@ -63,17 +64,13 @@ MANIFEST
 
 # Custom
 internal-docs/
-internal-docs/*
+internal-docs/**
 !internal-docs/PUBLISHING.md
 
 # VitePress
 docs/.vitepress/cache/
 docs/.vitepress/dist/
 
-# Ignore generated example outputs
-examples/pydantic/
-examples/pydantic_flat/
-examples/pydantic_flat_init/
-examples/pydantic_init/
-examples/py-output/
-examples/test-results/
+**/examples/**
+!**/examples/source/
+!**/examples/source/**
