@@ -129,12 +129,10 @@ jobs:
 
       - name: Publish to npm (dry run)
         if: ${{ github.event_name == 'workflow_dispatch' && fromJSON(github.event.inputs.dry_run) }}
-        working-directory: ./npm-package/packages/core
         run: npm publish --dry-run --access public --ignore-scripts
 
       - name: Publish to npm
         if: ${{ github.event_name != 'workflow_dispatch' || !fromJSON(github.event.inputs.dry_run) }}
-        working-directory: ./npm-package/packages/core
         run: npm publish --provenance --access public --ignore-scripts
         # IMPORTANT: This uses npm Trusted Publishing (OIDC).
         # With trusted publishing configured, provenance is automatically generated.
