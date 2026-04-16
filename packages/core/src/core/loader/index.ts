@@ -3,6 +3,7 @@ import path from 'node:path';
 import fs from 'node:fs/promises';
 import ts from 'typescript';
 import type { ZodType } from 'zod';
+import { ensureTsLoader, looksLikeZodSchema } from './shared.js';
 
 export interface LoadZodSchemaOptions {
   /** Absolute or relative path to the TypeScript/JavaScript module containing the schema. */
@@ -81,29 +82,6 @@ export async function loadZodSchema(options: LoadZodSchemaOptions): Promise<Load
   }
 
   return { schema, warnings, dependencies };
-}
-
-let tsLoaderPromise: Promise<unknown> | null = null;
-async function ensureTsLoader(): Promise<void> {
-  if (tsLoaderPromise) {
-    await tsLoaderPromise;
-    return;
-  }
-  tsLoaderPromise = import('tsx/esm').catch((err) => {
-    tsLoaderPromise = null;
-    const message = err instanceof Error ? err.message : String(err);
-    throw new SchemaLoadError(
-      `Failed to register TypeScript loader (tsx). Install "tsx" as a dependency or precompile schemas. ${message}`,
-    );
-  });
-  await tsLoaderPromise;
-}
-
-function looksLikeZodSchema(value: unknown): value is ZodType {
-  if (!value || typeof value !== 'object') return false;
-  return (
-    '_def' in (value as Record<string, unknown>) || '_zod' in (value as Record<string, unknown>)
-  );
 }
 
 interface GraphOptions {

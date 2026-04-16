@@ -9,6 +9,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - More examples and recipes
 
+## [0.3.2] – 2026-04-16
+
+### Fixed
+
+- **Top-level union alias generation (Pydantic):** root `z.union(...)` and `z.discriminatedUnion(...)` schemas now emit concrete model classes for object variants before generating the type alias, fixing `NameError` in generated Python when `OptionN` classes were referenced but never defined.
+- **Python string literal escaping:** `pythonString()` now escapes `\r`, `\n`, `\t`, `\b`, `\f` control characters. Previously, schemas containing these characters generated syntactically invalid Python.
+- **Python raw string edge cases:** `pythonRawString()` now falls back to escaped strings when the value ends with `\` or contains newlines (both invalid in Python raw strings).
+- **Docs playground security vulnerabilities:** patched `astro` (>=5.18.1) and `@astrojs/node` to resolve high-severity advisories (devalue DoS, h3 SSE injection, svgo billion laughs, rollup path traversal).
+
+### Changed
+
+- **`trustedInput` required for schema loading (breaking for programmatic API users):** `loadZodSchema()` and `scanFolderForSchemas()` now require `trustedInput: true` to proceed, since both use dynamic `import()` which executes module code. The CLI passes this automatically. Library consumers must add `trustedInput: true` to their calls.
+- **Function default factories are no longer executed:** the Zod visitor no longer invokes `defaultValue()` functions. For Zod 3 schemas with factory defaults, `defaultValue` will be `undefined` with a warning. Zod 4 pre-evaluates factories, so behavior is unchanged there. This eliminates an arbitrary code execution vector during schema conversion.
+- **Removed `zod` from production `dependencies`:** `zod` is now only a `peerDependency`. Previously it was in both, which forced Zod 4 installation even for Zod 3 consumers.
+- **Removed `vitepress-plugin-group-icons` from production `dependencies`:** this docs-only VitePress plugin was incorrectly listed as a core dependency, pulling in `vite`, `rollup`, and other heavy build tooling for all npm consumers. Core package now has zero security audit vulnerabilities.
+- **Removed `pkill -f vitest` from test script:** the previous test script killed all system-wide vitest processes before running, which could interfere with other projects.
+
+### Security
+
+- **Docs playground (`/api/convert`) hardened:**
+  - Added AST-based safe expression validation — user code is now parsed with TypeScript's compiler API and only whitelisted Zod builder expressions are allowed (replaces naive regex-based schema detection)
+  - User code is no longer executed directly; the endpoint reconstructs a clean module from validated AST nodes
+  - Added in-process rate limiting (30 requests/min per IP) with automatic eviction of expired entries
+  - Added production guard (`SCHEMABRIDGE_ENABLE_DOCS_CONVERSION=true` required in production)
+  - Added conversion timeout (8s) with `AbortController` cancellation to stop wasted CPU on timed-out requests
+  - Added `Content-Length` validation and request body size limits before JSON parsing
+  - Added error message sanitization to prevent path disclosure
+- **Added `trustedInput` guard on all dynamic import paths** in both `loadZodSchema()` and `scanFolderForSchemas()`.
+- **Added security documentation:** `SECURITY.md` now includes operational security notes and a release checklist. `README.md` documents that CLI schema loading executes module code.
+
+### Technical
+
+- Deduplicated `looksLikeZodSchema()` and `ensureTsLoader()` (previously copy-pasted across `loader/index.ts` and `folder-scanner.ts`) into shared `loader/shared.ts` module.
+- Removed empty `converters/` directory.
+- Updated publish workflow path handling for npm publish steps.
+
 ## [0.3.1] – 2025-12-01
 
 ### Added

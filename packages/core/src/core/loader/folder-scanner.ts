@@ -8,6 +8,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import type { ZodType } from 'zod';
+import { ensureTsLoader, looksLikeZodSchema } from './shared.js';
 
 export interface SchemaExport {
   /** File path (absolute) */
@@ -196,29 +197,6 @@ async function extractSchemasFromFile(
   }
 
   return schemas;
-}
-
-function looksLikeZodSchema(value: unknown): value is ZodType {
-  if (!value || typeof value !== 'object') return false;
-  return (
-    '_def' in (value as Record<string, unknown>) || '_zod' in (value as Record<string, unknown>)
-  );
-}
-
-let tsLoaderPromise: Promise<unknown> | null = null;
-async function ensureTsLoader(): Promise<void> {
-  if (tsLoaderPromise) {
-    await tsLoaderPromise;
-    return;
-  }
-  tsLoaderPromise = import('tsx/esm').catch((err) => {
-    tsLoaderPromise = null;
-    const message = err instanceof Error ? err.message : String(err);
-    throw new Error(
-      `Failed to register TypeScript loader (tsx). Install "tsx" as a dependency. ${message}`,
-    );
-  });
-  await tsLoaderPromise;
 }
 
 /**
