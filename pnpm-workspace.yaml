@@ -1,2 +1,6 @@
 packages:
   - 'packages/*'
+
+updateConfig:
+  ignoreDependencies:
+    - zod-v3

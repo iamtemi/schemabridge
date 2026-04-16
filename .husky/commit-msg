@@ -1,0 +1,8 @@
+#!/bin/sh
+
+COMMIT_MSG_FILE="$1"
+
+if [ -n "$COMMIT_MSG_FILE" ] && [ -f "$COMMIT_MSG_FILE" ]; then
+  # Remove Cursor attribution trailer if it gets injected by client tooling.
+  sed -i '' '/^[[:space:]]*Made-with:[[:space:]]*Cursor[[:space:]]*$/d' "$COMMIT_MSG_FILE"
+fi

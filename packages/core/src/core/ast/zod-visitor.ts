@@ -102,10 +102,16 @@ function walkSchema(schema: ZodType, path: string[], warnings: VisitorWarning[])
     case 'default':
     case 'ZodDefault': {
       const innerType = defObj.innerType as ZodType;
-      const defaultValue =
-        typeof defObj.defaultValue === 'function'
-          ? (defObj.defaultValue as () => unknown)()
-          : defObj.defaultValue;
+      const rawDefault = defObj.defaultValue;
+      const defaultValue = typeof rawDefault === 'function' ? undefined : rawDefault;
+      if (typeof rawDefault === 'function') {
+        warnings.push({
+          code: 'unsupported_effect',
+          path,
+          message:
+            'Encountered function default factory; skipping execution and default value extraction.',
+        });
+      }
       return {
         type: 'default',
         defaultValue,

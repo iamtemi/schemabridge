@@ -150,6 +150,17 @@ describe('visitZodSchema', () => {
     });
   });
 
+  it('handles function defaults without explicit invocation in visitor', () => {
+    const { node, warnings } = visitZodSchema(z.string().default(() => 'computed'));
+
+    expect(node).toEqual({
+      type: 'default',
+      defaultValue: 'computed',
+      inner: { type: 'string' },
+    });
+    expect(warnings).toHaveLength(0);
+  });
+
   it('represents unions', () => {
     const { node } = visitZodSchema(z.union([z.literal('a'), z.number()]));
 

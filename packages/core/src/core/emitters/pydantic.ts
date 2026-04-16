@@ -105,7 +105,7 @@ export function emitPydanticEnum(root: SchemaNode, options: EmitPydanticOptions)
 export function emitPydanticTypeAlias(root: SchemaNode, options: EmitPydanticOptions): string {
   const ctx: EmitContext = {
     typingImports: new Set(),
-    pydanticImports: new Set(),
+    pydanticImports: new Set(['BaseModel']),
     needsUUID: false,
     needsDate: false,
     needsDatetime: false,
@@ -127,9 +127,30 @@ export function emitPydanticTypeAlias(root: SchemaNode, options: EmitPydanticOpt
 
   const typeName = toPascalCase(options.name);
   const annotation = buildAnnotation(root, ctx, [], typeName);
-  const importLines = buildImports(ctx);
 
-  const sections = [importLines, `type ${typeName} = ${annotation.annotation}`].filter(Boolean);
+  // Collect and render any object schemas reachable from the root (e.g. union members)
+  const objectBlocks: string[] = [];
+  collectObjectNodes(root, [], (objNode, objPath) => {
+    const pathKey = objPath.join('.');
+    if (ctx.renderedPaths.has(pathKey)) return;
+    ctx.renderedPaths.add(pathKey);
+
+    const fallbackName = objPath[objPath.length - 1] ?? typeName;
+    const className = getNameForPath(pathKey, fallbackName, ctx, objPath, typeName);
+    objectBlocks.push(renderObject(objNode, className, ctx, objPath));
+  });
+
+  const importLines = buildImports(ctx);
+  const regexLines = buildRegexConstants(ctx);
+  const enumClassesBlock = buildEnumClasses(ctx);
+
+  const sections = [
+    importLines,
+    regexLines,
+    enumClassesBlock,
+    ...objectBlocks,
+    `type ${typeName} = ${annotation.annotation}`,
+  ].filter(Boolean);
   return sections.join('\n\n');
 }
 
@@ -663,11 +684,24 @@ function pythonLiteral(value: unknown): string {
 }
 
 function pythonString(value: string): string {
-  const escaped = value.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+  const escaped = value
+    .replace(/\\/g, '\\\\')
+    .replace(/\r/g, '\\r')
+    .replace(/\n/g, '\\n')
+    .replace(/\t/g, '\\t')
+    .split('\b')
+    .join('\\b')
+    .replace(/\f/g, '\\f')
+    .replace(/"/g, '\\"');
   return `"${escaped}"`;
 }
 
 function pythonRawString(value: string): string {
+  // Fallback to normal escaped strings when raw strings would be invalid
+  // (e.g. trailing backslash or embedded newlines).
+  if (value.endsWith('\\') || /[\r\n]/.test(value)) {
+    return pythonString(value);
+  }
   const escaped = value.replace(/"/g, '\\"');
   return `r"${escaped}"`;
 }

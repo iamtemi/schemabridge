@@ -1,6 +1,6 @@
 {
   "name": "@schemabridge/core",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "description": "Cross-language schema converter: Zod to Pydantic and TypeScript",
   "type": "module",
   "main": "./dist/index.js",
@@ -20,7 +20,7 @@
     "build:cli": "esbuild src/cli/index.ts --bundle --format=esm --platform=node --target=node18 --outfile=bin/schemabridge.js --packages=external --banner:js='#!/usr/bin/env node' --minify",
     "build:python": "mkdir -p ../../python/schemabridge/bin && cp bin/schemabridge.js ../../python/schemabridge/bin/schemabridge.js",
     "dev": "tsx src/cli/index.ts",
-    "test": "pkill -f vitest || true && vitest run && pnpm test:examples",
+    "test": "vitest run && pnpm test:examples",
     "test:unit": "vitest run tests/unit",
     "test:integration": "vitest run tests/integration",
     "test:watch": "vitest watch",
@@ -49,9 +49,7 @@
   "license": "MIT",
   "dependencies": {
     "tsx": "^4.20.6",
-    "typescript": "^5.9.3",
-    "vitepress-plugin-group-icons": "^1.6.5",
-    "zod": "^4.1.13"
+    "typescript": "^5.9.3"
   },
   "peerDependencies": {
     "zod": "^3.25.0 || ^4.0.0"
@@ -67,7 +65,7 @@
     "eslint-config-prettier": "^9.1.2",
     "globals": "^16.5.0",
     "husky": "^9.1.7",
-    "prettier": "^3.7.2",
+    "prettier": "^3.8.3",
     "typescript-eslint": "^8.48.0",
     "vitepress": "^1.6.4",
     "vitest": "^2.1.9"

@@ -1,6 +1,5 @@
-# Check lockfile is in sync with package.json
-# Try to install with frozen lockfile - if it fails, lockfile is out of sync
-if ! pnpm install --frozen-lockfile >/dev/null 2>&1; then
+# Check lockfile is in sync with package.json without mutating node_modules
+if ! pnpm install --frozen-lockfile --lockfile-only >/dev/null 2>&1; then
   echo "❌ pnpm-lock.yaml is out of sync with package.json"
   echo "Run 'pnpm install' to update the lockfile, then commit again."
   exit 1

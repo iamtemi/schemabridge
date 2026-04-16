@@ -8,6 +8,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import type { ZodType } from 'zod';
+import { ensureTsLoader, looksLikeZodSchema } from './shared.js';
 
 export interface SchemaExport {
   /** File path (absolute) */
@@ -31,6 +32,8 @@ export interface ScanFolderOptions {
   tsconfigPath?: string;
   /** Whether to allow unresolved imports */
   allowUnresolved?: boolean;
+  /** Dynamic module loading is unsafe for untrusted inputs; callers must opt-in. */
+  trustedInput?: boolean;
   /**
    * Optional export name pattern (simple wildcard) to filter which exports are treated as schemas.
    * Example: "*Schema" → only exports whose names end with "Schema".
@@ -56,8 +59,15 @@ export async function scanFolderForSchemas(options: ScanFolderOptions): Promise<
     registerTsLoader = true,
     tsconfigPath,
     allowUnresolved = false,
+    trustedInput = false,
     exportNamePattern,
   } = options;
+
+  if (!trustedInput) {
+    throw new Error(
+      'Refusing to dynamically import untrusted schema files. Set trustedInput: true only for trusted local files.',
+    );
+  }
 
   const resolvedDir = path.resolve(sourceDir);
   const schemas: SchemaExport[] = [];
@@ -187,29 +197,6 @@ async function extractSchemasFromFile(
   }
 
   return schemas;
-}
-
-function looksLikeZodSchema(value: unknown): value is ZodType {
-  if (!value || typeof value !== 'object') return false;
-  return (
-    '_def' in (value as Record<string, unknown>) || '_zod' in (value as Record<string, unknown>)
-  );
-}
-
-let tsLoaderPromise: Promise<unknown> | null = null;
-async function ensureTsLoader(): Promise<void> {
-  if (tsLoaderPromise) {
-    await tsLoaderPromise;
-    return;
-  }
-  tsLoaderPromise = import('tsx/esm').catch((err) => {
-    tsLoaderPromise = null;
-    const message = err instanceof Error ? err.message : String(err);
-    throw new Error(
-      `Failed to register TypeScript loader (tsx). Install "tsx" as a dependency. ${message}`,
-    );
-  });
-  await tsLoaderPromise;
 }
 
 /**

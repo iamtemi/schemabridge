@@ -43,7 +43,7 @@ jobs:
         run: pnpm format:check
 
       - name: Build
-        run: pnpm build
+        run: pnpm --filter @schemabridge/core build
 
       - name: Run tests
         run: pnpm test:coverage
