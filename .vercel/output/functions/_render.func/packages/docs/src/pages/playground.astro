@@ -1,0 +1,20 @@
+---
+import App from "../app";
+import "../styles/global.css";
+---
+
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width" />
+    <meta name="generator" content={Astro.generator} />
+    <title>SchemaBridge Playground</title>
+  </head>
+  <body>
+    <!-- client:load = hydrate immediately on page load -->
+    <App client:load />
+  </body>
+</html>
+
+

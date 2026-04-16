@@ -23,18 +23,40 @@ schemabridge convert folder ./src/schemas --out ./generated --to pydantic --init
 - Preserves structure; use `--flat` for a single directory.
 - `--init` drops `__init__.py` files so Python imports work.
 
-## Enum handling
+## Schema Types Supported
+
+SchemaBridge supports converting any Zod schema type as a root schema:
+
+- **Objects** (`z.object()`) → Pydantic models / TypeScript interfaces
+- **Enums** (`z.enum()`) → Enum classes / union types
+- **Unions** (`z.union()`) → Type aliases
+- **Primitives** (`z.string()`, `z.number()`, `z.ipv4()`, etc.) → Type aliases
+- **Arrays** (`z.array()`) → Type aliases
+
+**Examples:**
 
 ```ts
+// Objects
+export const userSchema = z.object({ id: z.string() });
+// → class UserSchema(BaseModel): ...
+
+// Enums
 export const role = z.enum(['admin', 'viewer']);
+// → class RoleEnum(str, Enum): ... (Pydantic)
+// → export type RoleEnum = "admin" | "viewer" (TypeScript)
+
+// Unions
+export const dateTypes = z.union([z.date(), z.iso.date()]);
+// → type DateTypes = Union[date, date] (Pydantic)
+// → export type DateTypes = Date | string (TypeScript)
+
+// Primitives
+export const ipv4 = z.ipv4();
+// → type Ipv4 = IPv4Address (Pydantic)
+// → export type Ipv4 = string (TypeScript)
 ```
 
-**Default behavior:**
-
-- Pydantic: Generates `class RoleEnum(str, Enum): ...`
-- TypeScript: `export type RoleEnum = "admin" | "viewer"`
-
-**Options:**
+**Enum Options:**
 
 - `--enum-style literal` - Use Literal types instead of Enum classes (Pydantic)
 - `--enum-base-type int` - Use `int, Enum` instead of `str, Enum` (Pydantic)

@@ -56,14 +56,20 @@ jobs:
         if: github.event_name == 'workflow_dispatch' && github.event.inputs.version != ''
         run: pnpm run set-version ${{ github.event.inputs.version }}
 
-      - name: Run tests
-        run: pnpm run ci
+      - name: Type check
+        run: pnpm typecheck
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Format check
+        run: pnpm format:check
 
       - name: Build Node.js project
-        run: pnpm build
+        run: pnpm --filter @schemabridge/core build
 
-      - name: Test bundled CLI
-        run: pnpm test:unit tests/unit/bundled-cli.test.ts
+      - name: Run tests
+        run: pnpm test:coverage
 
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -82,11 +88,11 @@ jobs:
         with:
           name: npm-package
           path: |
-            dist/
-            bin/
-            package.json
-            README.md
-            LICENSE
+            packages/core/dist/
+            packages/core/bin/
+            packages/core/package.json
+            packages/core/README.md
+            packages/core/LICENSE
 
       - name: Upload Python package artifact
         uses: actions/upload-artifact@v4
@@ -110,6 +116,23 @@ jobs:
         with:
           name: npm-package
 
+      - name: Debug - List downloaded files
+        run: |
+          echo "=== Current directory ==="
+          pwd
+          echo "=== File structure ==="
+          ls -la
+          echo "=== Looking for package.json ==="
+          find . -name "package.json" -type f
+          echo "=== Content check ==="
+          if [ -f "package.json" ]; then
+            echo "package.json found in root"
+          elif [ -f "packages/core/package.json" ]; then
+            echo "package.json found in packages/core/"
+          else
+            echo "package.json not found!"
+          fi
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -120,6 +143,12 @@ jobs:
         run: |
           npm install -g npm@^11.6.4
           npm --version
+
+      - name: Update package name for npm
+        run: |
+          # Change package name to schemabridge for npm (works with any current name)
+          node -e "const pkg = require('./package.json'); pkg.name = 'schemabridge'; require('fs').writeFileSync('package.json', JSON.stringify(pkg, null, 2));"
+          cat package.json | grep '"name"'
 
       - name: Publish to npm (dry run)
         if: ${{ github.event_name == 'workflow_dispatch' && fromJSON(github.event.inputs.dry_run) }}

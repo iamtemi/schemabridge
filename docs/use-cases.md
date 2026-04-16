@@ -241,10 +241,10 @@ schemabridge convert zod path/to/schema.ts \
 
 You’ll get:
 
-- **Python**: a `Literal["admin", "viewer"]` field for `role`.
+- **Python**: an Enum class for `role` by default (or a `Literal["admin", "viewer"]` field if you use the enum options).
 - **TypeScript**: a `"admin" | "viewer"` union type for `role`.
 
-Enums always map this way; nested objects become nested classes/interfaces.
+Enums always map to clear string values; nested objects become nested classes/interfaces.
 
 ---
 
