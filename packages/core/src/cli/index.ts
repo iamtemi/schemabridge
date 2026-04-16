@@ -83,6 +83,7 @@ export async function runCLI(argv: string[] = process.argv.slice(2)): Promise<nu
         preserveStructure: !parsed.flat,
         generateInitFiles: parsed.generateInitFiles,
         registerTsLoader: true,
+        trustedInput: true,
         allowUnresolved: parsed.allowUnresolved,
         ...(parsed.exportNamePattern !== undefined && {
           exportNamePattern: parsed.exportNamePattern,
@@ -113,6 +114,7 @@ export async function runCLI(argv: string[] = process.argv.slice(2)): Promise<nu
       file: parsed.inputFile,
       exportName: parsed.exportName,
       registerTsLoader: true,
+      trustedInput: true,
       ...(parsed.tsconfigPath !== undefined && { tsconfigPath: parsed.tsconfigPath }),
       allowUnresolved: parsed.allowUnresolved,
     });

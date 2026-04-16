@@ -27,6 +27,7 @@ describe('convertFolder init population', () => {
       sourceDir,
       outDir,
       target: 'pydantic',
+      trustedInput: true,
       preserveStructure: true,
       generateInitFiles: true,
     });
@@ -57,6 +58,7 @@ describe('convertFolder init population', () => {
       sourceDir,
       outDir,
       target: 'pydantic',
+      trustedInput: true,
       preserveStructure: false,
       generateInitFiles: true,
     });

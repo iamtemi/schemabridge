@@ -10,6 +10,8 @@ import { assertValidTypeScriptSyntax } from '../../src/utils/typescript-validato
 
 const makeTempDir = async () => fs.mkdtemp(path.join(os.tmpdir(), 'schemabridge-integration-'));
 const cleanupDirs: string[] = [];
+const loadTrustedSchema = (file: string, exportName: string) =>
+  loadZodSchema({ file, exportName, trustedInput: true });
 
 afterEach(async () => {
   for (const dir of cleanupDirs) {
@@ -55,18 +57,12 @@ describe('Integration tests for complex fixtures', () => {
   for (const fixture of fixtures) {
     describe(`${fixture.name}`, () => {
       it('loads schema successfully', async () => {
-        const { schema } = await loadZodSchema({
-          file: fixture.file,
-          exportName: fixture.exportName,
-        });
+        const { schema } = await loadTrustedSchema(fixture.file, fixture.exportName);
         expect(schema).toBeTruthy();
       });
 
       it('converts to Pydantic successfully', async () => {
-        const { schema } = await loadZodSchema({
-          file: fixture.file,
-          exportName: fixture.exportName,
-        });
+        const { schema } = await loadTrustedSchema(fixture.file, fixture.exportName);
 
         const pydanticCode = convertZodToPydantic(schema, {
           name: fixture.name,
@@ -92,10 +88,7 @@ describe('Integration tests for complex fixtures', () => {
       });
 
       it('converts to TypeScript successfully', async () => {
-        const { schema } = await loadZodSchema({
-          file: fixture.file,
-          exportName: fixture.exportName,
-        });
+        const { schema } = await loadTrustedSchema(fixture.file, fixture.exportName);
 
         const tsCode = convertZodToTypescript(schema, {
           name: fixture.name,
@@ -117,10 +110,7 @@ describe('Integration tests for complex fixtures', () => {
       });
 
       it('generates valid nested structures', async () => {
-        const { schema } = await loadZodSchema({
-          file: fixture.file,
-          exportName: fixture.exportName,
-        });
+        const { schema } = await loadTrustedSchema(fixture.file, fixture.exportName);
 
         const pydanticCode = convertZodToPydantic(schema, {
           name: fixture.name,
@@ -145,10 +135,7 @@ describe('Integration tests for complex fixtures', () => {
       });
 
       it('preserves constraints in Pydantic output', async () => {
-        const { schema } = await loadZodSchema({
-          file: fixture.file,
-          exportName: fixture.exportName,
-        });
+        const { schema } = await loadTrustedSchema(fixture.file, fixture.exportName);
 
         const pydanticCode = convertZodToPydantic(schema, {
           name: fixture.name,
@@ -167,10 +154,7 @@ describe('Integration tests for complex fixtures', () => {
       });
 
       it('handles optional/nullable fields correctly', async () => {
-        const { schema } = await loadZodSchema({
-          file: fixture.file,
-          exportName: fixture.exportName,
-        });
+        const { schema } = await loadTrustedSchema(fixture.file, fixture.exportName);
 
         const pydanticCode = convertZodToPydantic(schema, {
           name: fixture.name,

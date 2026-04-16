@@ -1,5 +1,6 @@
 import type { APIRoute } from 'astro';
 import { convertZodToPydantic, convertZodToTypescript, loadZodSchema } from '@schemabridge/core';
+import ts from 'typescript';
 import { mkdir, rm, symlink, writeFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -8,6 +9,11 @@ import { fileURLToPath } from 'node:url';
 
 const MAX_CODE_SIZE = 100 * 1024; // 100KB
 const MAX_SCHEMAS = 10;
+const CONVERSION_TIMEOUT_MS = 8_000;
+const RATE_LIMIT_WINDOW_MS = 60_000;
+const RATE_LIMIT_MAX_REQUESTS = 30;
+const PRODUCTION_GUARD_ENV = 'SCHEMABRIDGE_ENABLE_DOCS_CONVERSION';
+const rateLimitStore = new Map<string, { count: number; expiresAt: number }>();
 
 export const prerender = false;
 
@@ -22,28 +28,130 @@ function sanitizeErrorMessage(message: string | undefined): string {
     .replace(/file:\/\/[^\s]+/g, '[file]');
 }
 
-function findExportedSchemas(code: string): { names: string[]; duplicates: string[] } {
-  const matches = Array.from(code.matchAll(/export\s+(?:const|let|var)\s+(\w+)\s*=\s*z\./g));
-  const uniqueNames: string[] = [];
-  const seen = new Set<string>();
-  const duplicateSet = new Set<string>();
-
-  for (const match of matches) {
-    const name = match[1];
-    if (seen.has(name)) {
-      duplicateSet.add(name);
-      continue;
-    }
-    seen.add(name);
-    uniqueNames.push(name);
-  }
-
-  return { names: uniqueNames, duplicates: Array.from(duplicateSet) };
-}
-
 function findNonExportedSchemas(code: string, exported: Set<string>): string[] {
   const matches = Array.from(code.matchAll(/const\s+(\w+)\s*=\s*z\./g));
   return matches.map((match) => match[1]).filter((name) => !exported.has(name));
+}
+
+function getClientIp(request: Request): string {
+  const forwarded = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim();
+  if (forwarded) return forwarded;
+  return request.headers.get('x-real-ip') ?? 'unknown';
+}
+
+function isRateLimited(ip: string): boolean {
+  const now = Date.now();
+
+  // Evict expired entries to prevent unbounded growth
+  if (rateLimitStore.size > 1000) {
+    for (const [key, entry] of rateLimitStore) {
+      if (now >= entry.expiresAt) rateLimitStore.delete(key);
+    }
+  }
+
+  const existing = rateLimitStore.get(ip);
+  if (!existing || now >= existing.expiresAt) {
+    rateLimitStore.set(ip, { count: 1, expiresAt: now + RATE_LIMIT_WINDOW_MS });
+    return false;
+  }
+  existing.count += 1;
+  rateLimitStore.set(ip, existing);
+  return existing.count > RATE_LIMIT_MAX_REQUESTS;
+}
+
+function isConversionEnabled(): boolean {
+  if (process.env.NODE_ENV !== 'production') return true;
+  return process.env[PRODUCTION_GUARD_ENV] === 'true';
+}
+
+function isAllowedSafeExpression(node: ts.Node): boolean {
+  if (
+    ts.isStringLiteral(node) ||
+    ts.isNumericLiteral(node) ||
+    node.kind === ts.SyntaxKind.TrueKeyword ||
+    node.kind === ts.SyntaxKind.FalseKeyword ||
+    node.kind === ts.SyntaxKind.NullKeyword
+  ) {
+    return true;
+  }
+
+  if (ts.isIdentifier(node)) {
+    return node.text === 'z';
+  }
+
+  if (ts.isPrefixUnaryExpression(node)) {
+    return (
+      (node.operator === ts.SyntaxKind.MinusToken || node.operator === ts.SyntaxKind.PlusToken) &&
+      ts.isNumericLiteral(node.operand)
+    );
+  }
+
+  if (ts.isArrayLiteralExpression(node)) {
+    return node.elements.every((el) => isAllowedSafeExpression(el));
+  }
+
+  if (ts.isObjectLiteralExpression(node)) {
+    return node.properties.every((prop) => {
+      if (!ts.isPropertyAssignment(prop)) return false;
+      if (
+        !ts.isIdentifier(prop.name) &&
+        !ts.isStringLiteral(prop.name) &&
+        !ts.isNumericLiteral(prop.name)
+      ) {
+        return false;
+      }
+      return isAllowedSafeExpression(prop.initializer);
+    });
+  }
+
+  if (ts.isPropertyAccessExpression(node)) {
+    return isAllowedSafeExpression(node.expression);
+  }
+
+  if (ts.isCallExpression(node)) {
+    if (!isAllowedSafeExpression(node.expression)) return false;
+    return node.arguments.every((arg) => isAllowedSafeExpression(arg));
+  }
+
+  return false;
+}
+
+function extractSafeExportedSchemas(code: string): {
+  names: string[];
+  duplicates: string[];
+  safeModuleBody: string;
+} {
+  const source = ts.createSourceFile('schema.ts', code, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
+  const names: string[] = [];
+  const duplicateSet = new Set<string>();
+  const seen = new Set<string>();
+  const lines: string[] = [];
+
+  for (const statement of source.statements) {
+    if (!ts.isVariableStatement(statement)) continue;
+    const hasExport = statement.modifiers?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword);
+    if (!hasExport) continue;
+    if ((statement.declarationList.flags & ts.NodeFlags.Const) === 0) continue;
+
+    for (const declaration of statement.declarationList.declarations) {
+      if (!ts.isIdentifier(declaration.name) || !declaration.initializer) continue;
+      const name = declaration.name.text;
+      if (seen.has(name)) {
+        duplicateSet.add(name);
+        continue;
+      }
+      if (!isAllowedSafeExpression(declaration.initializer)) {
+        throw new Error(
+          `Unsupported schema expression for export "${name}". Only direct zod builder expressions are allowed in playground mode.`,
+        );
+      }
+      seen.add(name);
+      names.push(name);
+      lines.push(`export const ${name} = ${declaration.initializer.getText(source)};`);
+    }
+  }
+
+  return { names, duplicates: Array.from(duplicateSet), safeModuleBody: lines.join('\n') };
 }
 
 function extractImportsAndBody(
@@ -162,11 +270,55 @@ function findNodeModules(): string {
 }
 
 export const POST: APIRoute = async ({ request }) => {
+  if (!isConversionEnabled()) {
+    return new Response(
+      JSON.stringify({
+        error:
+          'Schema conversion API is disabled in production. Set SCHEMABRIDGE_ENABLE_DOCS_CONVERSION=true to enable.',
+      }),
+      { status: 503, headers: { 'Content-Type': 'application/json' } },
+    );
+  }
+
+  const ip = getClientIp(request);
+  if (isRateLimited(ip)) {
+    return new Response(JSON.stringify({ error: 'Rate limit exceeded. Try again shortly.' }), {
+      status: 429,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
+  const contentLength = request.headers.get('content-length');
+  if (!contentLength) {
+    return new Response(JSON.stringify({ error: 'Content-Length header is required.' }), {
+      status: 411,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+  const contentLengthValue = Number(contentLength);
+  if (!Number.isFinite(contentLengthValue) || contentLengthValue <= 0) {
+    return new Response(JSON.stringify({ error: 'Invalid Content-Length header.' }), {
+      status: 400,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+  if (contentLengthValue > MAX_CODE_SIZE * 2) {
+    return new Response(
+      JSON.stringify({
+        error: `Request body too large. Maximum ${MAX_CODE_SIZE * 2} bytes allowed.`,
+      }),
+      {
+        status: 413,
+        headers: { 'Content-Type': 'application/json' },
+      },
+    );
+  }
+
   const tempDir = join(
     tmpdir(),
     `schemabridge-${Date.now()}-${Math.random().toString(36).slice(2)}`,
   );
-  const tempFile = join(tempDir, 'schema.ts');
+  const tempFile = join(tempDir, 'safe-schema.ts');
 
   try {
     let body: any;
@@ -222,7 +374,11 @@ export const POST: APIRoute = async ({ request }) => {
       );
     }
 
-    const { names: exportNames, duplicates } = findExportedSchemas(schemaCode);
+    const {
+      names: exportNames,
+      duplicates,
+      safeModuleBody,
+    } = extractSafeExportedSchemas(schemaCode);
     if (exportNames.length === 0) {
       return new Response(
         JSON.stringify({
@@ -276,9 +432,7 @@ export const POST: APIRoute = async ({ request }) => {
       await symlink(zodSourcePath, zodLinkPath, 'dir');
     }
 
-    const codeWithVersion = schemaCode
-      .replace(/from\s+['"]zod['"]/g, `from '${zodPackageName}'`)
-      .replace(/require\((['"])zod\1\)/g, `require('${zodPackageName}')`);
+    const codeWithVersion = [`import { z } from '${zodPackageName}';`, safeModuleBody].join('\n');
 
     await writeFile(tempFile, codeWithVersion, 'utf-8');
 
@@ -288,54 +442,74 @@ export const POST: APIRoute = async ({ request }) => {
     const processedSchemas = new Set<string>();
     const seenErrors = new Set<string>();
 
-    for (const exportName of exportNames) {
-      if (processedSchemas.has(exportName)) continue;
-      processedSchemas.add(exportName);
-      try {
-        const { schema } = await loadZodSchema({
-          file: tempFile,
-          exportName,
-          registerTsLoader: true,
-          allowUnresolved: false,
-        });
+    const abortController = new AbortController();
+    const { signal } = abortController;
 
-        const output = isPython
-          ? convertZodToPydantic(schema, {
-              name: exportName,
-              enumStyle: 'enum',
-              enumBaseType: 'str',
-            })
-          : convertZodToTypescript(schema, { name: exportName });
+    const conversionWork = async () => {
+      for (const exportName of exportNames) {
+        if (signal.aborted) break;
+        if (processedSchemas.has(exportName)) continue;
+        processedSchemas.add(exportName);
+        try {
+          const { schema } = await loadZodSchema({
+            file: tempFile,
+            exportName,
+            registerTsLoader: true,
+            allowUnresolved: false,
+            trustedInput: true,
+          });
 
-        const { imports, body } = extractImportsAndBody(output, isPython);
-        allImports.push(imports);
+          if (signal.aborted) break;
 
-        const { enums, bodyWithoutEnums } = extractEnums(body, isPython);
-        allEnums.push(...enums.filter((block) => block.trim().length > 0));
+          const output = isPython
+            ? convertZodToPydantic(schema, {
+                name: exportName,
+                enumStyle: 'enum',
+                enumBaseType: 'str',
+              })
+            : convertZodToTypescript(schema, { name: exportName });
 
-        const cleanedBody = bodyWithoutEnums
-          .replace(/^\s*\n+/g, '') // remove leading blank lines between enums and body
-          .replace(/\n+$/, '')
-          .trimEnd();
-        if (cleanedBody) {
-          bodyOutputs.push(cleanedBody);
+          const { imports, body } = extractImportsAndBody(output, isPython);
+          allImports.push(imports);
+
+          const { enums, bodyWithoutEnums } = extractEnums(body, isPython);
+          allEnums.push(...enums.filter((block) => block.trim().length > 0));
+
+          const cleanedBody = bodyWithoutEnums
+            .replace(/^\s*\n+/g, '') // remove leading blank lines between enums and body
+            .replace(/\n+$/, '')
+            .trimEnd();
+          if (cleanedBody) {
+            bodyOutputs.push(cleanedBody);
+          }
+        } catch (error: any) {
+          if (signal.aborted) break;
+          const sanitized = sanitizeErrorMessage(error?.message);
+          const prefix = isPython ? '#' : '//';
+          const concise =
+            sanitized
+              .split('\n')
+              .map((line) => line.trim())
+              .find((line) => line.length > 0) ?? sanitized;
+          const key = `${exportName}:${concise}`;
+          if (!seenErrors.has(key)) {
+            seenErrors.add(key);
+            bodyOutputs.push(`${prefix} Error converting '${exportName}': ${concise}`);
+          }
+          allImports.push([]);
         }
-      } catch (error: any) {
-        const sanitized = sanitizeErrorMessage(error?.message);
-        const prefix = isPython ? '#' : '//';
-        const concise =
-          sanitized
-            .split('\n')
-            .map((line) => line.trim())
-            .find((line) => line.length > 0) ?? sanitized;
-        const key = `${exportName}:${concise}`;
-        if (!seenErrors.has(key)) {
-          seenErrors.add(key);
-          bodyOutputs.push(`${prefix} Error converting '${exportName}': ${concise}`);
-        }
-        allImports.push([]);
       }
-    }
+    };
+    const timeoutId = setTimeout(() => abortController.abort(), CONVERSION_TIMEOUT_MS);
+    await Promise.race([
+      conversionWork(),
+      new Promise((_, reject) =>
+        signal.addEventListener('abort', () =>
+          reject(new Error(`Conversion timed out after ${CONVERSION_TIMEOUT_MS}ms`)),
+        ),
+      ),
+    ]);
+    clearTimeout(timeoutId);
 
     const mergedImports = deduplicateImports(allImports);
     const mergedEnums = Array.from(

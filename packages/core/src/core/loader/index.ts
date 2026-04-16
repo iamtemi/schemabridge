@@ -15,6 +15,8 @@ export interface LoadZodSchemaOptions {
   tsconfigPath?: string;
   /** If true, unresolved imports are tolerated and produce warnings. */
   allowUnresolved?: boolean;
+  /** Dynamic module loading is unsafe for untrusted inputs; callers must opt-in. */
+  trustedInput?: boolean;
 }
 
 export class SchemaLoadError extends Error {
@@ -37,6 +39,12 @@ export interface LoadedSchema {
  * - Optionally walks imports to validate dependencies and collect warnings.
  */
 export async function loadZodSchema(options: LoadZodSchemaOptions): Promise<LoadedSchema> {
+  if (!options.trustedInput) {
+    throw new SchemaLoadError(
+      'Refusing to dynamically import untrusted schema modules. Set trustedInput: true only for trusted local files.',
+    );
+  }
+
   const resolvedPath = path.resolve(options.file);
 
   if (options.registerTsLoader) {

@@ -95,6 +95,7 @@ The Python CLI wraps the bundled Node CLI and supports the same commands and fla
 - Only **exported** schemas are converted; non‑exported helpers are ignored
 - Circular schema dependencies are not supported
 - TypeScript path aliases need to be discoverable from the working directory
+- Loading schemas via CLI executes module code; only convert trusted local schema files
 
 ## Contributing
 

@@ -30,3 +30,24 @@ We aim to:
 
 Please give us a reasonable amount of time to investigate and fix the issue before any public disclosure.  
 We’ll coordinate with you on timing once we understand the impact and a fix is ready.
+
+## Operational Security Notes
+
+- The docs playground conversion endpoint is intended to run in a constrained environment.
+- In production, require explicit opt-in via `SCHEMABRIDGE_ENABLE_DOCS_CONVERSION=true` to enable `/api/convert`.
+- Apply external rate limiting/WAF controls at the edge in addition to in-process throttling.
+- Treat CLI/folder conversion as trusted-input operations only.
+
+## Security Release Checklist
+
+Before release, run:
+
+1. `pnpm -r test`
+2. `pnpm security:audit`
+3. Manual staging checks for `/api/convert`:
+   - reject oversized requests before JSON parse
+   - enforce timeout on expensive payloads
+   - reject unsupported/non-safe schema expressions
+4. Verify no secrets are exposed in error messages.
+
+Record any accepted advisories (with reason and revisit date) in the release notes.

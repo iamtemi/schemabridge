@@ -31,6 +31,8 @@ export interface ScanFolderOptions {
   tsconfigPath?: string;
   /** Whether to allow unresolved imports */
   allowUnresolved?: boolean;
+  /** Dynamic module loading is unsafe for untrusted inputs; callers must opt-in. */
+  trustedInput?: boolean;
   /**
    * Optional export name pattern (simple wildcard) to filter which exports are treated as schemas.
    * Example: "*Schema" → only exports whose names end with "Schema".
@@ -56,8 +58,15 @@ export async function scanFolderForSchemas(options: ScanFolderOptions): Promise<
     registerTsLoader = true,
     tsconfigPath,
     allowUnresolved = false,
+    trustedInput = false,
     exportNamePattern,
   } = options;
+
+  if (!trustedInput) {
+    throw new Error(
+      'Refusing to dynamically import untrusted schema files. Set trustedInput: true only for trusted local files.',
+    );
+  }
 
   const resolvedDir = path.resolve(sourceDir);
   const schemas: SchemaExport[] = [];

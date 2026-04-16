@@ -255,6 +255,101 @@ describe('emitPydanticModel', () => {
   });
 });
 
+describe('Top-level aliases and unions', () => {
+  it('generates concrete classes for top-level union object variants', async () => {
+    const schema = z.union([
+      z.object({
+        kind: z.literal('sent'),
+        message: z.string(),
+      }),
+      z.object({
+        kind: z.literal('already_member'),
+        reason: z.string(),
+      }),
+    ]);
+
+    const code = convertZodToPydantic(schema, { name: 'InviteTeamMemberResponseSchema' }).trim();
+
+    // Should import BaseModel and typing.Union
+    expect(code).toContain('from pydantic import BaseModel');
+    expect(code).toContain('from typing import Literal, Union');
+
+    // Should define concrete model classes for union variants
+    expect(code).toContain('class Option0(BaseModel):');
+    expect(code).toContain('class Option1(BaseModel):');
+
+    // Alias should reference the generated classes
+    expect(code).toContain('type InviteTeamMemberResponseSchema = Union[Option0, Option1]');
+
+    await assertValidPythonSyntax(code);
+  });
+
+  it('generates concrete classes for top-level discriminated union variants', async () => {
+    const schema = z.discriminatedUnion('kind', [
+      z.object({
+        kind: z.literal('sent'),
+        message: z.string(),
+      }),
+      z.object({
+        kind: z.literal('already_member'),
+        reason: z.string(),
+      }),
+    ]);
+
+    const code = convertZodToPydantic(schema, { name: 'TeamMemberRowSchema' }).trim();
+
+    expect(code).toContain('from pydantic import BaseModel');
+    expect(code).toContain('from typing import Literal, Union');
+    expect(code).toContain('class Option0(BaseModel):');
+    expect(code).toContain('class Option1(BaseModel):');
+    expect(code).toContain('type TeamMemberRowSchema = Union[Option0, Option1]');
+
+    await assertValidPythonSyntax(code);
+  });
+
+  it('disambiguates nested inline names for top-level union variants', async () => {
+    const schema = z.union([
+      z.object({
+        kind: z.literal('a'),
+        data: z.object({
+          value: z.string(),
+        }),
+      }),
+      z.object({
+        kind: z.literal('b'),
+        data: z.object({
+          value: z.number(),
+        }),
+      }),
+    ]);
+
+    const code = convertZodToPydantic(schema, { name: 'InlineCollisionSchema' }).trim();
+
+    // Top-level variants
+    expect(code).toContain('class Option0(BaseModel):');
+    expect(code).toContain('class Option1(BaseModel):');
+    // Nested inline classes should be path-based and unique
+    expect(code).toContain('class Option0Data(BaseModel):');
+    expect(code).toContain('class Option1Data(BaseModel):');
+    expect(code).toContain('data: Option0Data');
+    expect(code).toContain('data: Option1Data');
+    expect(code).toContain('type InlineCollisionSchema = Union[Option0, Option1]');
+
+    await assertValidPythonSyntax(code);
+  });
+
+  it('escapes control characters in generated Python string literals', async () => {
+    const schema = z.object({
+      message: z.literal('line1\nline2\t"quoted"\rvalue'),
+    });
+
+    const code = convertZodToPydantic(schema, { name: 'EscapingSchema' }).trim();
+    expect(code).toContain('line1\\nline2\\t\\"quoted\\"\\rvalue');
+
+    await assertValidPythonSyntax(code);
+  });
+});
+
 describe('Enum support', () => {
   it('converts standalone enum to Python Enum class', async () => {
     const schema = z.enum(['active', 'inactive', 'suspended']);

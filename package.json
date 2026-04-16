@@ -9,12 +9,14 @@
     "format:check": "pnpm --filter @schemabridge/core format:check",
     "test:coverage": "pnpm --filter @schemabridge/core test:coverage",
     "typecheck": "pnpm -r typecheck",
+    "security:audit": "pnpm audit --prod",
+    "security:check": "pnpm -r test && pnpm security:audit",
     "docs:dev": "pnpm --filter @schemabridge/docs dev",
     "docs:build": "pnpm --filter @schemabridge/docs build",
     "docs:preview": "pnpm --filter @schemabridge/docs preview",
     "set-version": "node scripts/set-version.js"
   },
   "devDependencies": {
-    "prettier": "^3.7.2"
+    "prettier": "^3.8.3"
   }
 }
