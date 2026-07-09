@@ -67,10 +67,6 @@ internal-docs/
 internal-docs/**
 !internal-docs/PUBLISHING.md
 
-# VitePress
-docs/.vitepress/cache/
-docs/.vitepress/dist/
-
 **/examples/**
 !**/examples/source/
 !**/examples/source/**

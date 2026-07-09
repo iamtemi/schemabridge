@@ -188,7 +188,7 @@ After deployment, your docs will be available at:
 
 - **GitHub Pages**: `https://iamtemi.github.io/schemabridge/`
 
-The base path is configured in `docs/.vitepress/config.ts` as `/schemabridge/`.
+The docs app is configured in `packages/docs/astro.config.mjs`.
 
 ## Troubleshooting
 
@@ -215,7 +215,7 @@ The base path is configured in `docs/.vitepress/config.ts` as `/schemabridge/`.
 
 - Check GitHub Pages is enabled in repo settings
 - Verify the workflow ran successfully in Actions tab
-- Check the base path in VitePress config matches your repo name
+- Check the docs app configuration matches the deployment target
 
 ## Pre-release Checklist
 
