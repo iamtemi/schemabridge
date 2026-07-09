@@ -2,189 +2,71 @@
 title: Known Limitations
 ---
 
-# Known Limitations
+SchemaBridge is intentionally small. These are the boundaries to know before relying on generated output.
 
-This document outlines current limitations in SchemaBridge and workarounds where available.
+## Exported Schemas Only
 
-## Schema Type Limitations
+Folder conversion only scans exported schemas:
 
-### Exported Schemas Only
-
-**Status:** ✅ Only exported schemas are scanned and converted.
-
-**Behavior:** SchemaBridge only processes schemas that are exported from files. Non-exported schemas are ignored.
-
-**Example:**
-
-```typescript
-// ✅ This will be converted
+```ts
+// Converted
 export const userSchema = z.object({ id: z.string() });
 
-// ❌ This will be ignored
-const userSchema = z.object({ id: z.string() });
+// Ignored
+const internalSchema = z.object({ id: z.string() });
 ```
 
-**Why:** Scanning non-exported schemas would require full AST parsing of TypeScript files, which is significantly more complex and error-prone than the current module-based approach. The export requirement also makes it clear which schemas are intended for external use.
+This keeps conversion explicit and avoids a full TypeScript AST ownership model.
 
-### Enums
+## Runtime-Only Zod Logic
 
-**Status:** ✅ `z.enum()` schemas are now fully supported!
+`.transform()`, `.refine()`, `.superRefine()`, `.check()`, and `.preprocess()` are runtime behavior. SchemaBridge emits types from the input shape and warns when runtime-only effects are ignored.
 
-Standalone enum exports are converted to Python Enum classes or TypeScript union types:
-
-```typescript
-export const status = z.enum(['active', 'inactive']);
-// ✅ Converts to: class StatusEnum(str, Enum): ...
-```
-
-Enum fields in objects are converted to enum classes by default (or Literal types if `enumStyle: 'literal'` is specified).
-
-### Transform, Refine, and Effects
-
-**Limitation:** Zod methods like `.transform()`, `.refine()`, `.superRefine()`, `.check()`, and `.preprocess()` are not supported.
-
-**Behavior:** SchemaBridge ignores these methods and generates types based on the underlying schema structure. A warning is emitted.
-
-**Example:**
-
-```typescript
+```ts
 const schema = z.number().transform((n) => n * 2);
-// ⚠️ Warning: transform ignored, generates `float` type
+// Emits a number type, not the transformed runtime result.
 ```
 
-**Workaround:** These are runtime-only operations. The generated types represent the input shape, which is typically what you want for static types.
+## Cross-File References
 
-## Import and Dependency Limitations
+Imported schemas can be used when the module loads correctly. Generated files are still created per exported schema in the current scan.
 
-### Cross-File Schema References
+If `extendedSchema` uses `baseSchema`, SchemaBridge may inline the nested shape inside `extendedSchema`. It will only create a separate top-level file for `baseSchema` if `baseSchema` is also exported and included in the conversion.
 
-**Limitation:** When a schema references another schema from a different file, the referenced schema is not automatically included in the generated output.
-
-**Example:**
-
-```typescript
-// file1.ts
-export const baseSchema = z.object({ id: z.string() });
-
-// file2.ts
-import { baseSchema } from './file1.js';
-export const extendedSchema = z.object({
-  base: baseSchema, // ✅ Works at runtime
-  extra: z.number(),
-});
-```
-
-When converting `extendedSchema`:
-
-- ✅ The nested `Base` class is generated inline
-- ❌ `BaseSchema` is not generated as a separate top-level class
-
-**Workaround:** Convert both schemas separately:
-
-```bash
-schemabridge convert zod file1.ts --export baseSchema --to pydantic --out base.py
-schemabridge convert zod file2.ts --export extendedSchema --to pydantic --out extended.py
-```
-
-Or use folder conversion, which converts all schemas:
+Use folder conversion when you want every exported schema in a tree:
 
 ```bash
 schemabridge convert folder ./src --out ./generated --to pydantic
 ```
 
-### Circular Dependencies
+## Circular Schemas
 
-**Limitation:** Circular schema dependencies may cause issues.
+Circular or deeply recursive schemas are not a good fit yet. Prefer one-way schema dependencies or convert the simpler boundary schemas first.
 
-**Status:** Will be handled gracefully in future versions.
+## TypeScript Loading
 
-**Workaround:** Restructure schemas to avoid circular dependencies, or convert schemas individually.
+SchemaBridge loads trusted local schema files by executing them in Node.
 
-## TypeScript File Loading
+- Run from the project root when schemas rely on project-level `tsconfig.json`.
+- Use `--tsconfig <path>` for explicit path mapping.
+- Only `baseUrl` and `paths` are used from `tsconfig.json`.
+- Set `trustedInput: true` only for files you control.
 
-### TypeScript Execution
+## Output Naming
 
-**Requirement:** TypeScript files require a TypeScript loader to execute.
+Nested object names are derived from field paths. If generated names are not what you want, split important nested schemas into exported top-level schemas.
 
-**Default Behavior:** SchemaBridge automatically registers `tsx/esm` loader when `registerTsLoader: true` (default).
-
-**If `tsx` is not available:**
-
-1. Install `tsx`: `npm install tsx`
-2. Or precompile TypeScript to JavaScript
-
-### tsconfig.json Path Mappings
-
-**Support:** SchemaBridge supports TypeScript path mappings via `--tsconfig` flag.
-
-**Example:**
-
-```bash
-schemabridge convert zod schema.ts --export MySchema --to pydantic --tsconfig ./tsconfig.json
-```
-
-**Limitation:** Only `paths` and `baseUrl` are supported. Other TypeScript compiler options are ignored.
-
-## Output Limitations
-
-### Nested Class Names
-
-**Behavior:** Nested objects generate nested classes with auto-generated names.
-
-**Example:**
-
-```typescript
-z.object({
-  user: z.object({ name: z.string() }),
-});
-```
-
-Generates:
-
-```python
-class MySchema(BaseModel):
-    class User(BaseModel):  # Auto-generated name
-        name: str
-    user: User
-```
-
-**Note:** The nested class name is derived from the field name, not the schema name.
-
-### Default Values
-
-**Behavior:** Mutable defaults (arrays, objects) use `Field(default_factory=...)` to avoid shared mutable state.
-
-**Example:**
-
-```typescript
-z.object({
-  tags: z.array(z.string()).default([]),
-});
-```
-
-Generates:
+Mutable defaults in Python use `Field(default_factory=...)` so generated Pydantic models avoid shared mutable state:
 
 ```python
 tags: List[str] = Field(default_factory=list)
 ```
 
-This is correct Pydantic behavior, but may differ from Zod's runtime behavior in some edge cases.
+## Large Projects
 
-## Performance
+Folder scanning is deterministic and works well for normal projects. For very large trees, skip directories you do not want scanned:
 
-### Large Schemas
-
-**Status:** SchemaBridge handles large schemas well, but very deep nesting (>10 levels) may be slow.
-
-**Optimization:** Consider flattening deeply nested structures if performance is an issue.
-
-### Large Folder Scans
-
-**Status:** Folder scanning is efficient, but scanning thousands of files may take time.
-
-**Optimization:** Use `ignore` option to skip unnecessary directories:
-
-```typescript
+```ts
 await convertFolder({
   sourceDir: './src',
   outDir: './generated',
@@ -194,20 +76,6 @@ await convertFolder({
 });
 ```
 
-## Future Improvements
-
-These limitations are planned for future versions:
-
-- ✅ Automatic schema inclusion from other files
-- ✅ Circular dependency detection and handling
-- ✅ Enhanced error messages with source locations
-- ✅ Support for more Zod types (tuples, maps, etc.)
-- ✅ Performance optimizations for large schemas
-
 ## Reporting Issues
 
-If you encounter a limitation that's not documented here, please [open an issue](https://github.com/iamtemi/schemabridge/issues) with:
-
-- A minimal example showing the limitation
-- Expected vs. actual behavior
-- Your use case
+If a schema shape should be supported but is not, open an issue with a minimal Zod example, the command/API call, and the generated output you expected.

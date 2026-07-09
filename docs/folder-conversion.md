@@ -149,10 +149,10 @@ Schemas that reference each other in a circle can cause problems. Keep your sche
 To convert a schema, make sure it's exported:
 
 ```typescript
-// ✅ This will be converted
+// Converted
 export const userSchema = z.object({ ... });
 
-// ❌ This will be ignored
+// Ignored
 const userSchema = z.object({ ... });
 ```
 
@@ -160,5 +160,5 @@ const userSchema = z.object({ ... });
 
 ## Zod v4 tips
 
-- Use direct helpers: `z.date()`, `z.coerce.date()`, `z.string().uuid()`, `z.string().email()`.
+- Use direct helpers: `z.date()`, `z.coerce.date()`, `z.uuid()`, `z.email()`.
 - Use `z.coerce.date()` when you want Python `datetime` / TypeScript `Date` output. Use string datetime helpers only when you want string output.

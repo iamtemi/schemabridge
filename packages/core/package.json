@@ -81,7 +81,9 @@
     "url": "https://github.com/iamtemi/schemabridge/issues"
   },
   "files": [
-    "dist",
+    "dist/index.js",
+    "dist/index.d.ts",
+    "dist/core",
     "bin",
     "README.md",
     "LICENSE"

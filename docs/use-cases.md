@@ -1,45 +1,31 @@
-## Use Cases
+# Use Cases
 
-Simple, copy‑pasteable examples for common situations.
+Common ways to use SchemaBridge. The examples assume your schemas are exported from TypeScript files.
 
-Each section explains:
+## 1. One Zod Schema To Python
 
-- **What you’re trying to do**
-- **The command to run**
-- **How to use the result**
-
-The examples are short on purpose so you can read them fast and still trust them in a serious project.
-
-### 1. TS → Python (one schema)
-
-- **Goal**: You have a Zod schema in a TypeScript app and want a matching Pydantic model in Python.
-
-1. **Write the schema in TypeScript** (`schema.ts`):
+Input (`schema.ts`):
 
 ```ts
 import { z } from 'zod';
 
 export const userSchema = z.object({
-  id: z.string().uuid(),
-  email: z.string().email(),
+  id: z.uuid(),
+  email: z.email(),
   createdAt: z.date(),
 });
 ```
 
-2. **Generate the Python model**:
+Generate one Pydantic model:
 
 ```bash
-npx schemabridge convert zod path/to/schema.ts \
+npx schemabridge convert zod schema.ts \
   --export userSchema \
   --to pydantic \
-  --out path/to/user.py
+  --out user.py
 ```
 
-- **Change `path/to/schema.ts`** to the path of your `.ts` file.
-- **Change `userSchema`** if your exported schema has a different name.
-- **Change `path/to/user.py`** to where you want the Python file to be written.
-
-3. **Use it in Python**:
+Use it from Python:
 
 ```python
 from user import UserSchema
@@ -51,85 +37,41 @@ user = UserSchema(
 )
 ```
 
----
+## 2. Folder Of Schemas To A Python Package
 
-### 2. Monorepo → Python service
-
-- **Goal**: You have a folder of Zod schemas in a TypeScript package and you want Python models for all of them.
-
-Run this from the root of your monorepo:
+Use folder conversion when a TypeScript package owns several schemas:
 
 ```bash
 schemabridge convert folder ./packages/schemas \
   --out ./services/api/models \
   --to pydantic \
-  --init
+  --init \
+  --clean
 ```
 
-- **Change `./packages/schemas`** to the folder that contains your Zod schemas.
-- **Change `./services/api/models`** to the folder where you want Python models.
+`--init` creates package imports. `--clean` removes stale files only when they have the SchemaBridge generated-file marker.
 
-Then in Python:
+Then import generated models normally:
 
 ```python
 from services.api.models.user import UserSchema
 from services.api.models.order import OrderSchema
 ```
 
----
+If schemas live in another package, point `sourceDir` at that package or create a small wrapper file that re-exports the schemas you want.
 
-### 3. Python app using a TS package
+## 3. Generate TypeScript `.d.ts` Types
 
-- **Goal**: Your Zod schemas live in a TypeScript package, but your main app is in Python.
-
-1. **Install the package that contains the schemas**:
+For one schema:
 
 ```bash
-pnpm add shared-schemas
-```
-
-2. **Create a small wrapper file that re‑exports the Zod schemas** (`schemas.ts`):
-
-```ts
-export { userSchema } from 'shared-schemas/user';
-export { orderSchema } from 'shared-schemas/order';
-```
-
-3. **Generate Python models into your Python project**:
-
-```bash
-schemabridge convert folder ./node_modules/shared-schemas \
-  --out ./python/models \
-  --to pydantic \
-  --init \
-  --allow-unresolved
-```
-
-- **Change `./node_modules/shared-schemas`** if your package lives in a different folder.
-- **Change `./python/models`** to the folder where you keep generated Python code.
-
-4. **Use the models in Python**:
-
-```python
-from python.models.user_schema import UserSchema
-```
-
----
-
-### 4. TypeScript only (.d.ts types)
-
-- **Goal**: You use Zod in a front‑end or Node app and want `.d.ts` types that always match the schemas.
-
-For one file:
-
-```bash
-schemabridge convert zod path/to/schema.ts \
+schemabridge convert zod schema.ts \
   --export userSchema \
   --to typescript \
-  --out path/to/user.d.ts
+  --out user.d.ts
 ```
 
-For a folder of schemas:
+For a folder:
 
 ```bash
 schemabridge convert folder ./src/schemas \
@@ -137,22 +79,15 @@ schemabridge convert folder ./src/schemas \
   --to typescript
 ```
 
-- **Change the paths** so they match your project layout.
-- **Change `userSchema`** if your export has a different name.
-
-Then import the types in your app:
+Then import the generated type:
 
 ```ts
 import type { User } from './types/user';
 ```
 
----
+## 4. Build And CI Sync
 
-### 5. CI / build step
-
-- **Goal**: Make sure generated Python models are always up to date whenever Zod schemas change.
-
-Add a script (`scripts/generate-models.ts`):
+Use the API when generation is part of your build:
 
 ```ts
 import { convertFolder } from 'schemabridge';
@@ -163,6 +98,7 @@ await convertFolder({
   target: 'pydantic',
   preserveStructure: true,
   generateInitFiles: true,
+  clean: true,
   trustedInput: true,
 });
 ```
@@ -177,77 +113,10 @@ Wire it into `package.json`:
 }
 ```
 
-Example CI job:
+If generated files are committed, use `--verify` in CI to fail when they are stale:
 
 ```bash
-pnpm install
-pnpm generate:models
-pytest  # or your Python test runner
+schemabridge convert folder ./src/schemas --out ./python/models --to pydantic --init --verify
 ```
 
----
-
-### 6. One‑off conversion
-
-- **Goal**: You just want to try a schema and get Python code once, without wiring anything into a project.
-
-1. **Create a scratch file** (`tmp-schema.ts`):
-
-```ts
-import { z } from 'zod';
-
-export const payloadSchema = z.object({
-  id: z.string().uuid(),
-  amount: z.number(),
-  createdAt: z.date(),
-});
-```
-
-2. **Convert and look at the output**:
-
-```bash
-schemabridge convert zod tmp-schema.ts --export payloadSchema --to pydantic --out payload.py
-cat payload.py
-```
-
----
-
-### 7. Nested schemas and enums
-
-- **Goal**: See how enums and nested objects in Zod appear in Python and TypeScript.
-
-Zod input:
-
-```ts
-export const roleSchema = z.enum(['admin', 'viewer']);
-
-export const userSchema = z.object({
-  id: z.string().uuid(),
-  role: roleSchema,
-});
-```
-
-Command:
-
-```bash
-schemabridge convert zod path/to/schema.ts \
-  --export userSchema \
-  --to all \
-  --out ./generated
-```
-
-- **Change `path/to/schema.ts`** to your file.
-- **Change `userSchema`** to your export name if it is different.
-- **Change `./generated`** to the output folder you want.
-
-You’ll get:
-
-- **Python**: an Enum class for `role` by default (or a `Literal["admin", "viewer"]` field if you use the enum options).
-- **TypeScript**: a `"admin" | "viewer"` union type for `role`.
-
-Enums always map to clear string values; nested objects become nested classes/interfaces.
-
----
-
-If your situation is a bit different, pick the example that is closest, adjust the paths, and change `--to` or the flags you need.  
-For full option lists, see the **CLI Guide** and **API Reference**.
+For all flags and API options, see the CLI Guide and API Reference.

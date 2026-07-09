@@ -15,8 +15,8 @@ import { z } from 'zod';
 import { convertZodToPydantic, convertZodToTypescript } from 'schemabridge';
 
 const userSchema = z.object({
-  id: z.string().uuid(),
-  email: z.string().email(),
+  id: z.uuid(),
+  email: z.email(),
 });
 
 const py = convertZodToPydantic(userSchema, { name: 'UserSchema' });
@@ -181,7 +181,7 @@ export const ipv4 = z.ipv4();
 
 ## Zod v4
 
-- Prefer `z.date()`, `z.coerce.date()`, `z.string().uuid()`, `z.string().email()`.
+- Prefer `z.date()`, `z.coerce.date()`, `z.uuid()`, `z.email()`.
 - Use string datetime helpers only when you want string output.
 
 ::: warning Transform and Refine
