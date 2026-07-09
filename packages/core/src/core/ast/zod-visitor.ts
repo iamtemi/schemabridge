@@ -63,6 +63,8 @@ export interface VisitResult {
   warnings: VisitorWarning[];
 }
 
+type InferredStringType = 'uuid' | 'isodate' | 'datetime' | 'ipv4' | 'ipv6' | 'time' | 'duration';
+
 /**
  * Visit a Zod schema and convert it to SchemaBridge AST.
  * @param schema - Zod schema instance (Zod 3 or 4)
@@ -86,190 +88,263 @@ function walkSchema(schema: unknown, path: string[], warnings: VisitorWarning[])
 
   const defObj = def as Record<string, unknown>;
   const typeName = normalizeTypeName(defObj);
-
-  switch (typeName) {
-    case 'optional':
-    case 'ZodOptional': {
-      const innerType = defObj.innerType as ZodType;
-      return { type: 'optional', inner: walkSchema(innerType, path, warnings) };
-    }
-    case 'nullable':
-    case 'ZodNullable': {
-      const innerType = defObj.innerType as ZodType;
-      return { type: 'nullable', inner: walkSchema(innerType, path, warnings) };
-    }
-    case 'nullish':
-    case 'ZodNullish': {
-      const innerType = defObj.innerType as ZodType;
-      return { type: 'nullish', inner: walkSchema(innerType, path, warnings) };
-    }
-    case 'default':
-    case 'ZodDefault': {
-      const innerType = defObj.innerType as ZodType;
-      const rawDefault = defObj.defaultValue;
-      const defaultValue = typeof rawDefault === 'function' ? undefined : rawDefault;
-      if (typeof rawDefault === 'function') {
-        warnings.push({
-          code: 'unsupported_effect',
-          path,
-          message:
-            'Encountered function default factory; skipping execution and default value extraction.',
-        });
-      }
-      return {
-        type: 'default',
-        defaultValue,
-        inner: walkSchema(innerType, path, warnings),
-      };
-    }
-    case 'effects':
-    case 'ZodEffects': {
-      const effectType =
-        (defObj.effect as { type?: string } | undefined)?.type ??
-        (defObj.effects as Array<{ type?: string }> | undefined)?.[0]?.type;
-      warnings.push({
-        code: 'unsupported_effect',
-        path,
-        message: `Encountered Zod effect${effectType ? ` "${effectType}"` : ''}; using base schema shape.`,
-      });
-      const inner = (defObj.schema as ZodType) ?? (defObj.innerType as ZodType);
-      return walkSchema(inner, path, warnings);
-    }
-
-    case 'pipe': {
-      warnings.push({
-        code: 'unsupported_effect',
-        path,
-        message: 'Encountered Zod pipeline; using input schema shape.',
-      });
-      const inner = (defObj.in as ZodType) ?? (defObj.schema as ZodType);
-      return walkSchema(inner, path, warnings);
-    }
+  const wrapperNode = walkWrapperSchema(typeName, defObj, path, warnings);
+  if (wrapperNode) {
+    return wrapperNode;
   }
 
+  return walkSchemaType(typeName, defObj, path, warnings);
+}
+
+function walkWrapperSchema(
+  typeName: string | undefined,
+  defObj: Record<string, unknown>,
+  path: string[],
+  warnings: VisitorWarning[],
+): SchemaNode | undefined {
+  switch (typeName) {
+    case 'optional':
+    case 'ZodOptional':
+      return wrapInnerSchema('optional', defObj, path, warnings);
+    case 'nullable':
+    case 'ZodNullable':
+      return wrapInnerSchema('nullable', defObj, path, warnings);
+    case 'nullish':
+    case 'ZodNullish':
+      return wrapInnerSchema('nullish', defObj, path, warnings);
+    case 'default':
+    case 'ZodDefault':
+      return walkDefaultSchema(defObj, path, warnings);
+    case 'effects':
+    case 'ZodEffects':
+      return walkEffectsSchema(defObj, path, warnings);
+    case 'pipe':
+      return walkPipeSchema(defObj, path, warnings);
+    default:
+      return undefined;
+  }
+}
+
+function wrapInnerSchema(
+  wrapper: 'optional' | 'nullable' | 'nullish',
+  defObj: Record<string, unknown>,
+  path: string[],
+  warnings: VisitorWarning[],
+): SchemaNode {
+  const innerType = defObj.innerType as ZodType;
+  return { type: wrapper, inner: walkSchema(innerType, path, warnings) };
+}
+
+function walkDefaultSchema(
+  defObj: Record<string, unknown>,
+  path: string[],
+  warnings: VisitorWarning[],
+): SchemaNode {
+  const innerType = defObj.innerType as ZodType;
+  const rawDefault = defObj.defaultValue;
+  const defaultValue = typeof rawDefault === 'function' ? undefined : rawDefault;
+  if (typeof rawDefault === 'function') {
+    warnings.push({
+      code: 'unsupported_effect',
+      path,
+      message:
+        'Encountered function default factory; skipping execution and default value extraction.',
+    });
+  }
+  return {
+    type: 'default',
+    defaultValue,
+    inner: walkSchema(innerType, path, warnings),
+  };
+}
+
+function walkEffectsSchema(
+  defObj: Record<string, unknown>,
+  path: string[],
+  warnings: VisitorWarning[],
+): SchemaNode {
+  const effectType =
+    (defObj.effect as { type?: string } | undefined)?.type ??
+    (defObj.effects as Array<{ type?: string }> | undefined)?.[0]?.type;
+  const message = effectType
+    ? `Encountered Zod effect "${effectType}"; using base schema shape.`
+    : 'Encountered Zod effect; using base schema shape.';
+  warnings.push({
+    code: 'unsupported_effect',
+    path,
+    message,
+  });
+  const inner = (defObj.schema as ZodType) ?? (defObj.innerType as ZodType);
+  return walkSchema(inner, path, warnings);
+}
+
+function walkPipeSchema(
+  defObj: Record<string, unknown>,
+  path: string[],
+  warnings: VisitorWarning[],
+): SchemaNode {
+  warnings.push({
+    code: 'unsupported_effect',
+    path,
+    message: 'Encountered Zod pipeline; using input schema shape.',
+  });
+  const inner = (defObj.in as ZodType) ?? (defObj.schema as ZodType);
+  return walkSchema(inner, path, warnings);
+}
+
+function walkSchemaType(
+  typeName: string | undefined,
+  defObj: Record<string, unknown>,
+  path: string[],
+  warnings: VisitorWarning[],
+): SchemaNode {
   switch (typeName) {
     case 'string':
-    case 'ZodString': {
-      const { constraints, inferredType } = extractStringConstraints(defObj);
-      if (inferredType === 'uuid') return { type: 'uuid' };
-      if (inferredType === 'isodate') return { type: 'isodate' };
-      if (inferredType === 'datetime') return { type: 'datetime' };
-      if (inferredType === 'ipv4') return { type: 'ipv4' };
-      if (inferredType === 'ipv6') return { type: 'ipv6' };
-      if (inferredType === 'time') return { type: 'time' };
-      if (inferredType === 'duration') return { type: 'duration' };
-      return constraints ? { type: 'string', constraints } : { type: 'string' };
-    }
+    case 'ZodString':
+      return walkStringSchema(defObj);
     case 'number':
-    case 'ZodNumber': {
-      const { constraints, isInt } = extractNumberConstraints(defObj);
-      if (isInt) {
-        return constraints ? { type: 'int', constraints } : { type: 'int' };
-      }
-      return constraints ? { type: 'number', constraints } : { type: 'number' };
-    }
+    case 'ZodNumber':
+      return walkNumberSchema(defObj);
     case 'boolean':
     case 'ZodBoolean':
       return { type: 'boolean' };
-
     case 'date':
     case 'ZodDate':
       return { type: 'date' };
-
     case 'uuid':
       return { type: 'uuid' };
-
     case 'enum':
-    case 'ZodEnum': {
-      const values =
-        (defObj.values as readonly string[]) ??
-        (defObj.entries
-          ? (Object.values(defObj.entries as Record<string, string>) as readonly string[])
-          : undefined) ??
-        [];
-      return { type: 'enum', values };
-    }
-
+    case 'ZodEnum':
+      return walkEnumSchema(defObj);
     case 'literal':
-    case 'ZodLiteral': {
-      const directValue = 'value' in defObj ? (defObj as { value: unknown }).value : undefined;
-      const arrayValue =
-        'values' in defObj && Array.isArray((defObj as { values: unknown }).values)
-          ? (defObj as { values: unknown[] }).values[0]
-          : undefined;
-      const setValue =
-        'values' in defObj && (defObj as { values: Set<unknown> }).values instanceof Set
-          ? (defObj as { values: Set<unknown> }).values.values().next().value
-          : undefined;
-
-      return { type: 'literal', value: directValue ?? arrayValue ?? setValue };
-    }
-
+    case 'ZodLiteral':
+      return walkLiteralSchema(defObj);
     case 'null':
-    case 'ZodNull': {
+    case 'ZodNull':
       return { type: 'literal', value: null };
-    }
-
     case 'object':
-    case 'ZodObject': {
-      const shapeGetter = defObj.shape as (() => Record<string, unknown>) | Record<string, unknown>;
-      const shape = typeof shapeGetter === 'function' ? shapeGetter() : shapeGetter;
-      const fields: Record<string, SchemaNode> = {};
-      for (const [key, value] of Object.entries(shape)) {
-        fields[key] = walkSchema(value, [...path, key], warnings);
-      }
-      return { type: 'object', fields };
-    }
-
+    case 'ZodObject':
+      return walkObjectSchema(defObj, path, warnings);
     case 'array':
-    case 'ZodArray': {
-      const elementType =
-        (defObj.element as ZodType) ??
-        (defObj.type !== 'array' ? (defObj.type as ZodType) : undefined) ??
-        (defObj.elementType as ZodType) ??
-        (defObj.items as ZodType);
-      if (!elementType) {
-        throw new Error('Array schema missing element type');
-      }
-      return { type: 'array', element: walkSchema(elementType, [...path, '[element]'], warnings) };
-    }
-
+    case 'ZodArray':
+      return walkArraySchema(defObj, path, warnings);
     case 'union':
-    case 'ZodUnion': {
-      const options = (defObj.options as ZodType[]) || [];
-      return {
-        type: 'union',
-        options: options.map((opt, idx) => walkSchema(opt, [...path, `option${idx}`], warnings)),
-      };
-    }
-
-    case 'ZodDiscriminatedUnion': {
-      const optionsMap =
-        (defObj.options as Map<string, ZodType>) ?? (defObj.optionsMap as Map<string, ZodType>);
-      const options = optionsMap ? Array.from(optionsMap.values()) : [];
-      return {
-        type: 'union',
-        options: options.map((opt, idx) => walkSchema(opt, [...path, `option${idx}`], warnings)),
-      };
-    }
-
+    case 'ZodUnion':
+      return walkUnionOptions((defObj.options as ZodType[]) || [], path, warnings);
+    case 'ZodDiscriminatedUnion':
+      return walkDiscriminatedUnionSchema(defObj, path, warnings);
     case 'any':
     case 'ZodAny':
       return { type: 'any' };
-
     case 'unknown':
     case 'ZodUnknown':
       return { type: 'unknown' };
-
-    default: {
-      warnings.push({
-        code: 'unknown_type',
-        path,
-        message: `Unknown or unsupported Zod schema type "${String(typeName)}"; defaulting to 'any'.`,
-      });
-      return { type: 'any' };
-    }
+    default:
+      return walkUnknownSchema(typeName, path, warnings);
   }
+}
+
+function walkStringSchema(defObj: Record<string, unknown>): SchemaNode {
+  const { constraints, inferredType } = extractStringConstraints(defObj);
+  if (inferredType) {
+    return { type: inferredType };
+  }
+  return constraints ? { type: 'string', constraints } : { type: 'string' };
+}
+
+function walkNumberSchema(defObj: Record<string, unknown>): SchemaNode {
+  const { constraints, isInt } = extractNumberConstraints(defObj);
+  const type = isInt ? 'int' : 'number';
+  return constraints ? { type, constraints } : { type };
+}
+
+function walkEnumSchema(defObj: Record<string, unknown>): SchemaNode {
+  const values =
+    (defObj.values as readonly string[]) ??
+    (defObj.entries ? Object.values(defObj.entries as Record<string, string>) : undefined) ??
+    [];
+  return { type: 'enum', values };
+}
+
+function walkLiteralSchema(defObj: Record<string, unknown>): SchemaNode {
+  if ('value' in defObj) {
+    return { type: 'literal', value: (defObj as { value: unknown }).value };
+  }
+
+  const values = (defObj as { values?: unknown }).values;
+  if (Array.isArray(values)) {
+    return { type: 'literal', value: values[0] };
+  }
+  if (values instanceof Set) {
+    return { type: 'literal', value: values.values().next().value };
+  }
+
+  return { type: 'literal', value: undefined };
+}
+
+function walkObjectSchema(
+  defObj: Record<string, unknown>,
+  path: string[],
+  warnings: VisitorWarning[],
+): SchemaNode {
+  const shapeGetter = defObj.shape as (() => Record<string, unknown>) | Record<string, unknown>;
+  const shape = typeof shapeGetter === 'function' ? shapeGetter() : shapeGetter;
+  const fields: Record<string, SchemaNode> = {};
+  for (const [key, value] of Object.entries(shape)) {
+    fields[key] = walkSchema(value, [...path, key], warnings);
+  }
+  return { type: 'object', fields };
+}
+
+function walkArraySchema(
+  defObj: Record<string, unknown>,
+  path: string[],
+  warnings: VisitorWarning[],
+): SchemaNode {
+  const elementType =
+    (defObj.element as ZodType) ??
+    (defObj.type !== 'array' ? (defObj.type as ZodType) : undefined) ??
+    (defObj.elementType as ZodType) ??
+    (defObj.items as ZodType);
+  if (!elementType) {
+    throw new Error('Array schema missing element type');
+  }
+  return { type: 'array', element: walkSchema(elementType, [...path, '[element]'], warnings) };
+}
+
+function walkUnionOptions(
+  options: ZodType[],
+  path: string[],
+  warnings: VisitorWarning[],
+): SchemaNode {
+  return {
+    type: 'union',
+    options: options.map((opt, idx) => walkSchema(opt, [...path, `option${idx}`], warnings)),
+  };
+}
+
+function walkDiscriminatedUnionSchema(
+  defObj: Record<string, unknown>,
+  path: string[],
+  warnings: VisitorWarning[],
+): SchemaNode {
+  const optionsMap =
+    (defObj.options as Map<string, ZodType>) ?? (defObj.optionsMap as Map<string, ZodType>);
+  const options = optionsMap ? Array.from(optionsMap.values()) : [];
+  return walkUnionOptions(options, path, warnings);
+}
+
+function walkUnknownSchema(
+  typeName: string | undefined,
+  path: string[],
+  warnings: VisitorWarning[],
+): SchemaNode {
+  warnings.push({
+    code: 'unknown_type',
+    path,
+    message: `Unknown or unsupported Zod schema type "${String(typeName)}"; defaulting to 'any'.`,
+  });
+  return { type: 'any' };
 }
 
 function isPrimitiveLiteralValue(value: unknown): value is string | number | boolean | null {
@@ -296,12 +371,7 @@ function normalizeTypeName(def: Record<string, unknown>): string | undefined {
   const rawType = typeof def.type === 'string' ? def.type : undefined;
   if (rawType) return rawType;
 
-  const rawTypeName =
-    typeof def.typeName === 'string'
-      ? def.typeName
-      : typeof def.typeName === 'symbol'
-        ? def.typeName.description
-        : undefined;
+  const rawTypeName = readLegacyTypeName(def);
   if (!rawTypeName) return undefined;
 
   if (rawTypeName.startsWith('Symbol(') && rawTypeName.endsWith(')')) {
@@ -310,117 +380,78 @@ function normalizeTypeName(def: Record<string, unknown>): string | undefined {
   return rawTypeName;
 }
 
+function readLegacyTypeName(def: Record<string, unknown>): string | undefined {
+  if (typeof def.typeName === 'string') {
+    return def.typeName;
+  }
+  if (typeof def.typeName === 'symbol') {
+    return def.typeName.description;
+  }
+  return undefined;
+}
+
+interface StringConstraintState {
+  constraints: StringConstraints;
+  inferredType?: InferredStringType;
+}
+
 function extractStringConstraints(def: Record<string, unknown>): {
   constraints?: StringConstraints;
-  inferredType?: 'uuid' | 'isodate' | 'datetime' | 'ipv4' | 'ipv6' | 'time' | 'duration';
+  inferredType?: InferredStringType;
 } {
   const checks = (def.checks as unknown[]) || [];
-  const constraints: StringConstraints = {};
-  let inferredType:
-    | 'uuid'
-    | 'isodate'
-    | 'datetime'
-    | 'ipv4'
-    | 'ipv6'
-    | 'time'
-    | 'duration'
-    | undefined;
+  const state: StringConstraintState = { constraints: {} };
 
-  // Handle checks array (Zod 3 style)
   for (const check of checks) {
     const normalized = normalizeStringCheck(check);
-    if (!normalized) continue;
-
-    switch (normalized.kind) {
-      case 'min':
-        constraints.minLength = normalized.value;
-        break;
-      case 'max':
-        constraints.maxLength = normalized.value;
-        break;
-      case 'length':
-        constraints.length = normalized.value;
-        break;
-      case 'regex':
-        constraints.regex = normalized.regex;
-        break;
-      case 'uuid':
-        inferredType = 'uuid';
-        break;
-      case 'datetime':
-        inferredType = 'datetime';
-        break;
-      case 'isodate':
-        inferredType = 'isodate';
-        break;
-      case 'ipv4':
-        inferredType = 'ipv4';
-        break;
-      case 'ipv6':
-        inferredType = 'ipv6';
-        break;
-      case 'time':
-        inferredType = 'time';
-        break;
-      case 'duration':
-        inferredType = 'duration';
-        break;
+    if (normalized) {
+      applyStringCheck(normalized, state);
     }
   }
 
-  // Handle direct check property (Zod 4 style, e.g., z.uuid())
   if (checks.length === 0 && def.check) {
     const normalized = normalizeStringCheck(def);
     if (normalized) {
-      switch (normalized.kind) {
-        case 'uuid':
-          inferredType = 'uuid';
-          break;
-        case 'datetime':
-          inferredType = 'datetime';
-          break;
-        case 'isodate':
-          inferredType = 'isodate';
-          break;
-        case 'ipv4':
-          inferredType = 'ipv4';
-          break;
-        case 'ipv6':
-          inferredType = 'ipv6';
-          break;
-        case 'time':
-          inferredType = 'time';
-          break;
-        case 'duration':
-          inferredType = 'duration';
-          break;
-        case 'regex':
-          constraints.regex = normalized.regex;
-          break;
-        case 'min':
-          constraints.minLength = normalized.value;
-          break;
-        case 'max':
-          constraints.maxLength = normalized.value;
-          break;
-        case 'length':
-          constraints.length = normalized.value;
-          break;
-      }
+      applyStringCheck(normalized, state);
     }
   }
 
   const result: {
     constraints?: StringConstraints;
-    inferredType?: 'uuid' | 'isodate' | 'datetime' | 'ipv4' | 'ipv6' | 'time' | 'duration';
+    inferredType?: InferredStringType;
   } = {};
-  if (Object.keys(constraints).length > 0) {
-    result.constraints = constraints;
+  if (Object.keys(state.constraints).length > 0) {
+    result.constraints = state.constraints;
   }
-  if (inferredType !== undefined) {
-    result.inferredType = inferredType;
+  if (state.inferredType !== undefined) {
+    result.inferredType = state.inferredType;
   }
   return result;
+}
+
+function applyStringCheck(normalized: NormalizedStringCheck, state: StringConstraintState): void {
+  switch (normalized.kind) {
+    case 'min':
+      state.constraints.minLength = normalized.value;
+      return;
+    case 'max':
+      state.constraints.maxLength = normalized.value;
+      return;
+    case 'length':
+      state.constraints.length = normalized.value;
+      return;
+    case 'regex':
+      state.constraints.regex = normalized.regex;
+      return;
+    case 'uuid':
+    case 'datetime':
+    case 'isodate':
+    case 'ipv4':
+    case 'ipv6':
+    case 'time':
+    case 'duration':
+      state.inferredType = normalized.kind;
+  }
 }
 
 function extractNumberConstraints(def: Record<string, unknown>): {
@@ -431,63 +462,17 @@ function extractNumberConstraints(def: Record<string, unknown>): {
   const constraints: NumberConstraints = {};
   let isInt = false;
 
-  // Handle checks array (Zod 3 style)
   for (const check of checks) {
     const normalized = normalizeNumberCheck(check);
-    if (!normalized) continue;
-
-    switch (normalized.kind) {
-      case 'min':
-        constraints.min = {
-          value: normalized.value,
-          inclusive: normalized.inclusive ?? true,
-        };
-        if (constraints.min.value === 0 && constraints.min.inclusive === false) {
-          constraints.positive = true;
-        }
-        if (constraints.min.value === 0 && constraints.min.inclusive === true) {
-          constraints.nonnegative = true;
-        }
-        break;
-      case 'max':
-        constraints.max = {
-          value: normalized.value,
-          inclusive: normalized.inclusive ?? true,
-        };
-        break;
-      case 'int':
-        isInt = true;
-        break;
+    if (normalized) {
+      isInt = applyNumberCheck(normalized, constraints) || isInt;
     }
   }
 
-  // Handle direct check property (Zod 4 style, e.g., z.int())
   if (checks.length === 0 && def.check) {
     const normalized = normalizeNumberCheck(def);
     if (normalized) {
-      switch (normalized.kind) {
-        case 'int':
-          isInt = true;
-          break;
-        case 'min':
-          constraints.min = {
-            value: normalized.value,
-            inclusive: normalized.inclusive ?? true,
-          };
-          if (constraints.min.value === 0 && constraints.min.inclusive === false) {
-            constraints.positive = true;
-          }
-          if (constraints.min.value === 0 && constraints.min.inclusive === true) {
-            constraints.nonnegative = true;
-          }
-          break;
-        case 'max':
-          constraints.max = {
-            value: normalized.value,
-            inclusive: normalized.inclusive ?? true,
-          };
-          break;
-      }
+      isInt = applyNumberCheck(normalized, constraints) || isInt;
     }
   }
 
@@ -499,6 +484,39 @@ function extractNumberConstraints(def: Record<string, unknown>): {
     result.constraints = constraints;
   }
   return result;
+}
+
+function applyNumberCheck(
+  normalized: NormalizedNumberCheck,
+  constraints: NumberConstraints,
+): boolean {
+  switch (normalized.kind) {
+    case 'int':
+      return true;
+    case 'min':
+      constraints.min = {
+        value: normalized.value,
+        inclusive: normalized.inclusive ?? true,
+      };
+      applyMinBoundaryFlags(constraints);
+      return false;
+    case 'max':
+      constraints.max = {
+        value: normalized.value,
+        inclusive: normalized.inclusive ?? true,
+      };
+      return false;
+  }
+}
+
+function applyMinBoundaryFlags(constraints: NumberConstraints): void {
+  if (!constraints.min) return;
+  if (constraints.min.value === 0 && constraints.min.inclusive === false) {
+    constraints.positive = true;
+  }
+  if (constraints.min.value === 0 && constraints.min.inclusive === true) {
+    constraints.nonnegative = true;
+  }
 }
 
 type NormalizedStringCheck =
@@ -514,60 +532,85 @@ type NormalizedStringCheck =
   | { kind: 'time' }
   | { kind: 'duration' };
 
+const STRING_FORMAT_TO_KIND: Record<string, InferredStringType> = {
+  uuid: 'uuid',
+  datetime: 'datetime',
+  date: 'isodate',
+  ipv4: 'ipv4',
+  ipv6: 'ipv6',
+  time: 'time',
+  duration: 'duration',
+};
+
+function inferredStringCheck(format: string): NormalizedStringCheck | null {
+  const kind = STRING_FORMAT_TO_KIND[format];
+  return kind ? { kind } : null;
+}
+
 function normalizeStringCheck(raw: unknown): NormalizedStringCheck | null {
   if (!raw || typeof raw !== 'object') return null;
 
-  if ('kind' in raw) {
-    const legacy = raw as { kind: string; value?: unknown; regex?: RegExp | string };
-    switch (legacy.kind) {
-      case 'min':
-        return { kind: 'min', value: legacy.value as number };
-      case 'max':
-        return { kind: 'max', value: legacy.value as number };
-      case 'length':
-        return { kind: 'length', value: legacy.value as number };
-      case 'regex':
-        return { kind: 'regex', regex: legacy.regex as RegExp | string };
-      case 'uuid':
-        return { kind: 'uuid' };
-      case 'datetime':
-        return { kind: 'datetime' };
-      case 'date':
-        return { kind: 'isodate' };
-      case 'ipv4':
-        return { kind: 'ipv4' };
-      case 'ipv6':
-        return { kind: 'ipv6' };
-      case 'time':
-        return { kind: 'time' };
-      case 'duration':
-        return { kind: 'duration' };
-    }
+  const legacy = normalizeLegacyStringCheck(raw);
+  if (legacy) return legacy;
+
+  const direct = normalizeDirectStringFormatCheck(raw);
+  if (direct) return direct;
+
+  return normalizeDefStringCheck(raw);
+}
+
+function normalizeLegacyStringCheck(raw: object): NormalizedStringCheck | null {
+  if (!('kind' in raw)) return null;
+
+  const legacy = raw as { kind: string; value?: unknown; regex?: RegExp | string };
+  switch (legacy.kind) {
+    case 'min':
+      return { kind: 'min', value: legacy.value as number };
+    case 'max':
+      return { kind: 'max', value: legacy.value as number };
+    case 'length':
+      return { kind: 'length', value: legacy.value as number };
+    case 'regex':
+      return { kind: 'regex', regex: legacy.regex as RegExp | string };
+    case 'uuid':
+      return { kind: 'uuid' };
+    case 'datetime':
+      return { kind: 'datetime' };
+    case 'date':
+      return { kind: 'isodate' };
+    case 'ipv4':
+      return { kind: 'ipv4' };
+    case 'ipv6':
+      return { kind: 'ipv6' };
+    case 'time':
+      return { kind: 'time' };
+    case 'duration':
+      return { kind: 'duration' };
+    default:
+      return null;
+  }
+}
+
+function normalizeDirectStringFormatCheck(raw: object): NormalizedStringCheck | null {
+  const check = (raw as { check?: string }).check;
+  if (check !== 'string_format') return null;
+
+  const format = (raw as { format?: string; pattern?: RegExp | string }).format;
+  if (format === 'regex') {
+    const pattern = (raw as { pattern?: RegExp | string }).pattern;
+    return pattern ? { kind: 'regex', regex: pattern } : null;
   }
 
-  // Check if raw itself is a def object (Zod 4 style, e.g., z.uuid())
-  const directCheck = (raw as { check?: string; format?: string; pattern?: RegExp | string }).check;
-  if (directCheck === 'string_format') {
-    const format = (raw as { format?: string; pattern?: RegExp | string }).format;
-    if (format === 'regex' && (raw as { pattern?: RegExp | string }).pattern) {
-      return { kind: 'regex', regex: (raw as { pattern: RegExp | string }).pattern };
-    }
-    if (format === 'uuid') return { kind: 'uuid' };
-    if (format === 'datetime') return { kind: 'datetime' };
-    if (format === 'date') return { kind: 'isodate' };
-    if (format === 'ipv4') return { kind: 'ipv4' };
-    if (format === 'ipv6') return { kind: 'ipv6' };
-    if (format === 'time') return { kind: 'time' };
-    if (format === 'duration') return { kind: 'duration' };
-  }
+  return inferredStringCheck(format ?? '');
+}
 
+function normalizeDefStringCheck(raw: object): NormalizedStringCheck | null {
   const def =
     (raw as { _zod?: { def: Record<string, unknown> }; def?: Record<string, unknown> })._zod?.def ??
     (raw as { def?: Record<string, unknown> }).def;
-
   if (!def) return null;
-  const checkType = def.check as string | undefined;
 
+  const checkType = def.check as string | undefined;
   switch (checkType) {
     case 'min_length':
       return { kind: 'min', value: def.minimum as number };
@@ -575,23 +618,20 @@ function normalizeStringCheck(raw: unknown): NormalizedStringCheck | null {
       return { kind: 'max', value: def.maximum as number };
     case 'length_equals':
       return { kind: 'length', value: def.length as number };
-    case 'string_format': {
-      const format = def.format as string | undefined;
-      if (format === 'regex' && def.pattern) {
-        return { kind: 'regex', regex: def.pattern as RegExp | string };
-      }
-      if (format === 'uuid') return { kind: 'uuid' };
-      if (format === 'datetime') return { kind: 'datetime' };
-      if (format === 'date') return { kind: 'isodate' };
-      if (format === 'ipv4') return { kind: 'ipv4' };
-      if (format === 'ipv6') return { kind: 'ipv6' };
-      if (format === 'time') return { kind: 'time' };
-      if (format === 'duration') return { kind: 'duration' };
-      return null;
-    }
+    case 'string_format':
+      return stringFormatCheckFromDef(def);
     default:
       return null;
   }
+}
+
+function stringFormatCheckFromDef(def: Record<string, unknown>): NormalizedStringCheck | null {
+  const format = def.format as string | undefined;
+  if (format === 'regex' && def.pattern) {
+    return { kind: 'regex', regex: def.pattern as RegExp | string };
+  }
+
+  return inferredStringCheck(format ?? '');
 }
 
 type NormalizedNumberCheck =
@@ -602,61 +642,77 @@ type NormalizedNumberCheck =
 function normalizeNumberCheck(raw: unknown): NormalizedNumberCheck | null {
   if (!raw || typeof raw !== 'object') return null;
 
-  if ('kind' in raw) {
-    const legacy = raw as { kind: string; value?: unknown; inclusive?: boolean };
-    switch (legacy.kind) {
-      case 'min': {
-        const result: NormalizedNumberCheck = { kind: 'min', value: legacy.value as number };
-        if (legacy.inclusive !== undefined) {
-          result.inclusive = legacy.inclusive;
-        }
-        return result;
-      }
-      case 'max': {
-        const result: NormalizedNumberCheck = { kind: 'max', value: legacy.value as number };
-        if (legacy.inclusive !== undefined) {
-          result.inclusive = legacy.inclusive;
-        }
-        return result;
-      }
-      case 'int':
-        return { kind: 'int' };
-      case 'positive':
-        return { kind: 'min', value: 0, inclusive: false };
-      case 'nonnegative':
-        return { kind: 'min', value: 0, inclusive: true };
-    }
-  }
+  const legacy = normalizeLegacyNumberCheck(raw);
+  if (legacy) return legacy;
 
-  // Check if raw itself is a def object (Zod 4 style, e.g., z.int())
-  const directCheck = (
-    raw as { check?: string; format?: string; value?: number; inclusive?: boolean }
-  ).check;
-  if (directCheck === 'number_format') {
+  const direct = normalizeDirectNumberCheck(raw);
+  if (direct) return direct;
+
+  return normalizeDefNumberCheck(raw);
+}
+
+function normalizeLegacyNumberCheck(raw: object): NormalizedNumberCheck | null {
+  if (!('kind' in raw)) return null;
+
+  const legacy = raw as { kind: string; value?: unknown; inclusive?: boolean };
+  switch (legacy.kind) {
+    case 'min': {
+      const result: NormalizedNumberCheck = { kind: 'min', value: legacy.value as number };
+      if (legacy.inclusive !== undefined) {
+        result.inclusive = legacy.inclusive;
+      }
+      return result;
+    }
+    case 'max': {
+      const result: NormalizedNumberCheck = { kind: 'max', value: legacy.value as number };
+      if (legacy.inclusive !== undefined) {
+        result.inclusive = legacy.inclusive;
+      }
+      return result;
+    }
+    case 'int':
+      return { kind: 'int' };
+    case 'positive':
+      return { kind: 'min', value: 0, inclusive: false };
+    case 'nonnegative':
+      return { kind: 'min', value: 0, inclusive: true };
+    default:
+      return null;
+  }
+}
+
+function normalizeDirectNumberCheck(raw: object): NormalizedNumberCheck | null {
+  const check = (raw as { check?: string }).check;
+  if (check === 'number_format') {
     const format = (raw as { format?: string }).format;
     if (format === 'int' || format === 'safeint') {
       return { kind: 'int' };
     }
   }
-  if (directCheck === 'greater_than') {
-    const value = (raw as { value?: number; inclusive?: boolean }).value;
-    const inclusive = (raw as { inclusive?: boolean }).inclusive;
+
+  if (check === 'greater_than') {
+    const value = (raw as { value?: number }).value;
     if (value !== undefined) {
+      const inclusive = (raw as { inclusive?: boolean }).inclusive;
       return { kind: 'min', value, inclusive: inclusive ?? false };
     }
   }
-  if (directCheck === 'less_than') {
-    const value = (raw as { value?: number; inclusive?: boolean }).value;
-    const inclusive = (raw as { inclusive?: boolean }).inclusive;
+
+  if (check === 'less_than') {
+    const value = (raw as { value?: number }).value;
     if (value !== undefined) {
+      const inclusive = (raw as { inclusive?: boolean }).inclusive;
       return { kind: 'max', value, inclusive: inclusive ?? false };
     }
   }
 
+  return null;
+}
+
+function normalizeDefNumberCheck(raw: object): NormalizedNumberCheck | null {
   const defFromZ4 = (raw as { _zod?: { def: Record<string, unknown> } })._zod?.def;
   const defFromInstance = (raw as { def?: Record<string, unknown> }).def;
-  const def = defFromZ4 ?? defFromInstance ?? undefined;
-
+  const def = defFromZ4 ?? defFromInstance;
   if (def) {
     const checkType = def.check as string | undefined;
     switch (checkType) {

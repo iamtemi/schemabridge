@@ -82,51 +82,73 @@ export async function scanFolderForSchemas(options: ScanFolderOptions): Promise<
     exportNamePattern !== undefined ? wildcardToRegExp(exportNamePattern) : undefined;
 
   const files = await findSchemaFiles(resolvedDir, extensions, ignore);
-  const visited = new Set<string>();
 
   for (const file of files) {
-    if (visited.has(file)) continue;
-    visited.add(file);
+    const outcome = await processSchemaFile(file, {
+      allowUnresolved,
+      ...(exportNameRegex !== undefined && { exportNameRegex }),
+      ...(tsconfigPath !== undefined && { tsconfigPath }),
+    });
 
-    try {
-      const extractOptions: {
-        registerTsLoader?: boolean;
-        tsconfigPath?: string;
-        allowUnresolved?: boolean;
-      } = {
-        registerTsLoader: false, // Already registered
-        allowUnresolved,
-      };
-      if (tsconfigPath !== undefined) {
-        extractOptions.tsconfigPath = tsconfigPath;
-      }
-      const fileSchemas = await extractSchemasFromFile(file, extractOptions);
-
-      const filteredSchemas =
-        exportNameRegex !== undefined
-          ? fileSchemas.filter((schema) => exportNameRegex.test(schema.exportName))
-          : fileSchemas;
-
-      if (filteredSchemas.length === 0) {
+    switch (outcome.kind) {
+      case 'schemas':
+        schemas.push(...outcome.schemas);
+        break;
+      case 'skipped':
         skippedFiles.push(file);
-        continue;
-      }
-
-      schemas.push(...filteredSchemas);
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      if (allowUnresolved) {
-        // Lenient mode: warn and continue
-        warnings.push(`Failed to process ${file}: ${message}`);
+        break;
+      case 'warning':
+        warnings.push(outcome.message);
         skippedFiles.push(file);
-        continue;
-      }
-      // Strict mode: surface the error to the caller
-      throw err instanceof Error ? err : new Error(message);
+        break;
+      case 'error':
+        throw outcome.error;
     }
   }
 
   return { schemas, warnings, skippedFiles };
+}
+
+type ProcessSchemaFileOutcome =
+  | { kind: 'schemas'; schemas: SchemaExport[] }
+  | { kind: 'skipped' }
+  | { kind: 'warning'; message: string }
+  | { kind: 'error'; error: Error };
+
+async function processSchemaFile(
+  file: string,
+  options: {
+    exportNameRegex?: RegExp;
+    tsconfigPath?: string;
+    allowUnresolved: boolean;
+  },
+): Promise<ProcessSchemaFileOutcome> {
+  try {
+    const fileSchemas = await extractSchemasFromFile(file, {
+      allowUnresolved: options.allowUnresolved,
+      ...(options.tsconfigPath !== undefined && { tsconfigPath: options.tsconfigPath }),
+    });
+
+    const filteredSchemas =
+      options.exportNameRegex !== undefined
+        ? fileSchemas.filter((schema) => options.exportNameRegex?.test(schema.exportName))
+        : fileSchemas;
+
+    if (filteredSchemas.length === 0) {
+      return { kind: 'skipped' };
+    }
+
+    return { kind: 'schemas', schemas: filteredSchemas };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    if (options.allowUnresolved) {
+      return { kind: 'warning', message: `Failed to process ${file}: ${message}` };
+    }
+    return {
+      kind: 'error',
+      error: err instanceof Error ? err : new Error(message),
+    };
+  }
 }
 
 /**
@@ -148,7 +170,7 @@ async function findSchemaFiles(
     for (const entry of entries) {
       const fullPath = path.join(currentDir, entry.name);
 
-      // Skip ignored directories/files
+      // Preserve existing substring matching behavior for ignore entries.
       if (ignore.some((pattern) => entry.name.includes(pattern))) {
         continue;
       }
@@ -174,7 +196,6 @@ async function findSchemaFiles(
 async function extractSchemasFromFile(
   file: string,
   _options: {
-    registerTsLoader?: boolean;
     tsconfigPath?: string;
     allowUnresolved?: boolean;
   },
@@ -207,9 +228,12 @@ async function extractSchemasFromFile(
  * Supports "*" as a wildcard for any characters.
  */
 function wildcardToRegExp(pattern: string): RegExp {
-  // Escape regex special characters, then replace '*' with '.*'
-  const escaped = pattern.replace(/[-/\\^$+?.()|[\]{}]/g, '\\$&').replace(/\*/g, '.*');
-  return new RegExp(`^${escaped}$`);
+  const escapedParts = pattern.split('*').map(escapeRegExp);
+  return new RegExp(`^${escapedParts.join('.*')}$`);
+}
+
+function escapeRegExp(value: string): string {
+  return value.replaceAll(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`);
 }
 
 function compareLexicographic(a: string, b: string): number {

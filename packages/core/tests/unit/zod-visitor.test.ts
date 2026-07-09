@@ -170,6 +170,17 @@ describe('visitZodSchema', () => {
     });
   });
 
+  it('preserves null literal values from Zod 3-style definitions', () => {
+    const legacyNullLiteral = {
+      _def: { typeName: 'ZodLiteral', value: null },
+    } as z.ZodType;
+
+    const { node, warnings } = visitZodSchema(legacyNullLiteral);
+
+    expect(warnings).toHaveLength(0);
+    expect(node).toEqual({ type: 'literal', value: null });
+  });
+
   it('emits warnings for effects but preserves inner shape', () => {
     const { node, warnings } = visitZodSchema(
       z.object({

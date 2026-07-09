@@ -269,6 +269,70 @@ function buildAnnotation(
   return result;
 }
 
+function buildStringType(
+  node: Extract<SchemaNode, { type: 'string' }>,
+  ctx: EmitContext,
+  path: string[],
+): TypeBuild {
+  const constraints = node.constraints;
+  if (!constraints) {
+    return { annotation: 'str' };
+  }
+
+  ctx.pydanticImports.add('constr');
+  const parts: string[] = [];
+  if (constraints.length !== undefined) {
+    parts.push(`min_length=${constraints.length}`, `max_length=${constraints.length}`);
+  } else {
+    if (constraints.minLength !== undefined) parts.push(`min_length=${constraints.minLength}`);
+    if (constraints.maxLength !== undefined) parts.push(`max_length=${constraints.maxLength}`);
+  }
+  if (constraints.regex !== undefined) {
+    const constName = registerRegex(constraints.regex, path, ctx);
+    parts.push(`pattern=${constName}`);
+  }
+  return { annotation: `constr(${parts.join(', ')})` };
+}
+
+function buildEnumType(
+  node: Extract<SchemaNode, { type: 'enum' }>,
+  ctx: EmitContext,
+  path: string[],
+  currentClass: string,
+): TypeBuild {
+  if (ctx.enumStyle === 'literal') {
+    ctx.typingImports.add('Literal');
+    const literalValues = node.values.map((v) => pythonLiteral(v));
+    return { annotation: `Literal[${literalValues.join(', ')}]` };
+  }
+
+  const key = node.values.slice().sort(compareLexicographic).join('|');
+  const existingEnum = ctx.enumClasses.get(key);
+  if (existingEnum) {
+    return { annotation: existingEnum.name };
+  }
+
+  const enumPathKey = path.length > 0 ? `${path.join('.')}.Enum` : 'Enum';
+  const lastPathSegment = path.at(-1);
+  const enumName = getNameForPath(
+    enumPathKey,
+    lastPathSegment ? `${toPascalCase(lastPathSegment)}Enum` : 'Enum',
+    ctx,
+    [...path, 'Enum'],
+    currentClass,
+  );
+
+  const enumInfo: EnumClassInfo = {
+    name: enumName,
+    values: node.values,
+    baseType: ctx.enumBaseType,
+  };
+
+  ctx.enumClasses.set(key, enumInfo);
+  ctx.enumClassesToRender.push(enumInfo);
+  return { annotation: enumName };
+}
+
 function buildType(
   node: SchemaNode,
   ctx: EmitContext,
@@ -276,27 +340,8 @@ function buildType(
   currentClass: string,
 ): TypeBuild {
   switch (node.type) {
-    case 'string': {
-      const constraints = node.constraints;
-      if (constraints) {
-        ctx.pydanticImports.add('constr');
-        const parts: string[] = [];
-        if (constraints.length !== undefined) {
-          parts.push(`min_length=${constraints.length}`, `max_length=${constraints.length}`);
-        } else {
-          if (constraints.minLength !== undefined)
-            parts.push(`min_length=${constraints.minLength}`);
-          if (constraints.maxLength !== undefined)
-            parts.push(`max_length=${constraints.maxLength}`);
-        }
-        if (constraints.regex !== undefined) {
-          const constName = registerRegex(constraints.regex, path, ctx);
-          parts.push(`pattern=${constName}`);
-        }
-        return { annotation: `constr(${parts.join(', ')})` };
-      }
-      return { annotation: 'str' };
-    }
+    case 'string':
+      return buildStringType(node, ctx, path);
 
     case 'number': {
       const constraints = node.constraints;
@@ -319,11 +364,7 @@ function buildType(
       return { annotation: 'bool' };
 
     case 'date':
-      ctx.needsDate = true;
-      return { annotation: 'date' };
-
     case 'isodate':
-      // z.iso.date() - string format that Pydantic parses to date
       ctx.needsDate = true;
       return { annotation: 'date' };
 
@@ -351,44 +392,8 @@ function buildType(
       ctx.needsTimedelta = true;
       return { annotation: 'timedelta' };
 
-    case 'enum': {
-      if (ctx.enumStyle === 'literal') {
-        ctx.typingImports.add('Literal');
-        const literalValues = node.values.map((v) => pythonLiteral(v));
-        return { annotation: `Literal[${literalValues.join(', ')}]` };
-      }
-
-      // enumStyle === 'enum': generate or reference enum class
-      const key = node.values.slice().sort(compareLexicographic).join('|');
-      const existingEnum = ctx.enumClasses.get(key);
-
-      if (existingEnum) {
-        // Reference existing enum class
-        return { annotation: existingEnum.name };
-      }
-
-      // Generate new enum class
-      const enumPathKey = path.length > 0 ? `${path.join('.')}.Enum` : 'Enum';
-      const lastPathSegment = path.at(-1);
-      const enumName = getNameForPath(
-        enumPathKey,
-        lastPathSegment ? `${toPascalCase(lastPathSegment)}Enum` : 'Enum',
-        ctx,
-        [...path, 'Enum'],
-        currentClass,
-      );
-
-      const enumInfo: EnumClassInfo = {
-        name: enumName,
-        values: node.values,
-        baseType: ctx.enumBaseType,
-      };
-
-      ctx.enumClasses.set(key, enumInfo);
-      ctx.enumClassesToRender.push(enumInfo);
-
-      return { annotation: enumName };
-    }
+    case 'enum':
+      return buildEnumType(node, ctx, path, currentClass);
 
     case 'literal': {
       ctx.typingImports.add('Literal');
@@ -424,14 +429,11 @@ function buildType(
       return { annotation: className };
     }
 
-    case 'any':
-    case 'unknown':
-      ctx.typingImports.add('Any');
-      return { annotation: 'Any' };
-
     case 'reference':
       return { annotation: node.name };
 
+    case 'any':
+    case 'unknown':
     default:
       ctx.typingImports.add('Any');
       return { annotation: 'Any' };
@@ -647,13 +649,17 @@ function buildEnumClasses(ctx: EmitContext): string {
 function toEnumMemberName(value: string): string {
   // Convert string value to valid Python enum member name
   // Uppercase, replace non-alphanumeric with underscore
-  return (
-    value
-      .toUpperCase()
-      .replaceAll(/[^A-Z0-9_]/g, '_')
-      .replaceAll(/_+/g, '_')
-      .replaceAll(/^_+|_+$/g, '') || 'VALUE'
-  );
+  let memberName = value
+    .toUpperCase()
+    .replaceAll(/[^A-Z0-9_]/g, '_')
+    .replaceAll(/_+/g, '_');
+  while (memberName.startsWith('_')) {
+    memberName = memberName.slice(1);
+  }
+  while (memberName.endsWith('_')) {
+    memberName = memberName.slice(0, -1);
+  }
+  return memberName || 'VALUE';
 }
 
 function pythonLiteral(value: unknown): string {
@@ -706,12 +712,12 @@ function pythonRawString(value: string): string {
 }
 
 function sanitizePythonIdentifier(name: string): { name: string; alias?: string } {
-  const isValid = /^[A-Za-z_][A-Za-z0-9_]*$/.test(name);
+  const isValid = /^[A-Za-z_]\w*$/.test(name);
   if (isValid) {
     return { name };
   }
   const sanitized = name
-    .replaceAll(/[^A-Za-z0-9_]/g, '_')
+    .replaceAll(/\W/g, '_')
     .replaceAll(/^[^A-Za-z_]+/g, (m) => `_${m}`)
     .replaceAll(/_+/g, '_');
   return { name: sanitized || '_field', alias: name };

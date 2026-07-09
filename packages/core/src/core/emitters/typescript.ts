@@ -136,7 +136,7 @@ function renderInterface(
 
   const indent = (line: string) => (line.length === 0 ? '' : `  ${line}`);
   const bodyLines: string[] = [];
-  for (const line of fieldLines.length ? fieldLines : []) {
+  for (const line of fieldLines) {
     bodyLines.push(indent(line));
   }
 
@@ -167,6 +167,42 @@ function renderProperty(
   return `${escapedName}${optionalMarker}: ${typeAnnotation};`;
 }
 
+function buildPropertyTypeAnnotation(
+  baseType: string,
+  flags: { optional: boolean; nullable: boolean; nullish: boolean },
+): { typeAnnotation: string; isOptional: boolean } {
+  const { optional, nullable, nullish } = flags;
+
+  if (nullish || (optional && nullable)) {
+    return { typeAnnotation: `${baseType} | null`, isOptional: true };
+  }
+  if (optional) {
+    return { typeAnnotation: baseType, isOptional: true };
+  }
+  if (nullable) {
+    return { typeAnnotation: `${baseType} | null`, isOptional: false };
+  }
+  return { typeAnnotation: baseType, isOptional: false };
+}
+
+function buildStandaloneTypeAnnotation(
+  baseType: string,
+  flags: { optional: boolean; nullable: boolean; nullish: boolean },
+): { typeAnnotation: string; isOptional: boolean } {
+  const { optional, nullable, nullish } = flags;
+
+  if (nullish || (optional && nullable)) {
+    return { typeAnnotation: `${baseType} | null | undefined`, isOptional: false };
+  }
+  if (optional) {
+    return { typeAnnotation: `${baseType} | undefined`, isOptional: false };
+  }
+  if (nullable) {
+    return { typeAnnotation: `${baseType} | null`, isOptional: false };
+  }
+  return { typeAnnotation: baseType, isOptional: false };
+}
+
 function buildTypeAnnotation(
   node: SchemaNode,
   ctx: EmitContext,
@@ -176,41 +212,12 @@ function buildTypeAnnotation(
 ): { typeAnnotation: string; isOptional: boolean } {
   const { inner, optional, nullable, nullish } = unwrapOptionality(node);
   const baseType = buildBaseType(inner, ctx, path, currentInterface);
+  const flags = { optional, nullable, nullish };
 
-  let typeAnnotation = baseType;
-  let isOptional = false;
-
-  // Handle optionality for properties vs standalone types
   if (isProperty) {
-    // For object properties, use ? modifier
-    if (nullish) {
-      isOptional = true;
-      // nullish means T | null | undefined, use ? for optional and | null for nullable
-      typeAnnotation = `${baseType} | null`;
-    } else if (optional && nullable) {
-      // Both optional and nullable (e.g., z.string().optional().nullable())
-      isOptional = true;
-      typeAnnotation = `${baseType} | null`;
-    } else if (optional) {
-      isOptional = true;
-      typeAnnotation = baseType;
-    } else if (nullable) {
-      typeAnnotation = `${baseType} | null`;
-    }
-  } else {
-    // For standalone types, use union types
-    if (nullish) {
-      typeAnnotation = `${baseType} | null | undefined`;
-    } else if (optional && nullable) {
-      typeAnnotation = `${baseType} | null | undefined`;
-    } else if (optional) {
-      typeAnnotation = `${baseType} | undefined`;
-    } else if (nullable) {
-      typeAnnotation = `${baseType} | null`;
-    }
+    return buildPropertyTypeAnnotation(baseType, flags);
   }
-
-  return { typeAnnotation, isOptional };
+  return buildStandaloneTypeAnnotation(baseType, flags);
 }
 
 function buildBaseType(

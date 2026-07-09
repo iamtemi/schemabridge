@@ -47,15 +47,10 @@ describe('Bundled CLI (bin/schemabridge.js)', () => {
     if (!bundledCliExists) {
       expect.fail('Bundled CLI not found. Run `pnpm build` first.');
     }
-    try {
-      execSync(`node ${BUNDLED_CLI} --help`, { encoding: 'utf8', stdio: 'pipe' });
-      expect.fail('Should have thrown an error');
-    } catch (error: any) {
-      const output = error.stderr?.toString() || error.message || '';
-      expect(output).toContain('Usage:');
-      expect(output).toContain('convert zod');
-      expect(output).toContain('convert folder');
-    }
+    const output = execSync(`node ${BUNDLED_CLI} --help`, { encoding: 'utf8', stdio: 'pipe' });
+    expect(output).toContain('Usage:');
+    expect(output).toContain('convert zod');
+    expect(output).toContain('convert folder');
   });
 
   it('should convert a single schema to pydantic', async () => {

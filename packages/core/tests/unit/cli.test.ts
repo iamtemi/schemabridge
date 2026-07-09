@@ -30,6 +30,15 @@ afterEach(async () => {
 });
 
 describe('CLI runCLI', () => {
+  it('returns zero for help output', async () => {
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+
+    const code = await runCLI(['--help']);
+
+    expect(code).toBe(0);
+    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('Usage:'));
+  });
+
   it('writes output for pydantic target', async () => {
     const tmp = await makeTempDir();
     const outPath = path.join(tmp, 'model.py');

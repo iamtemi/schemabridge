@@ -7,7 +7,7 @@
 import fs from 'node:fs/promises';
 import type { Dirent } from 'node:fs';
 import path from 'node:path';
-import { convertZodToPydantic, convertZodToTypescript, type Target } from '../../index.js';
+import { convertZodToPydantic, convertZodToTypescript, type Target } from './convert.js';
 import {
   hasGeneratedMarker,
   normalizeGeneratedContent,
@@ -104,177 +104,285 @@ export async function convertFolder(options: ConvertFolderOptions): Promise<Conv
     await fs.mkdir(resolvedOutDir, { recursive: true });
   }
 
-  // Scan for all schemas
   const scanResult = await scanFolderForSchemas(scanOptions);
-  const allWarnings = [...scanResult.warnings];
-  const allSkipped = [...scanResult.skippedFiles];
-  const allErrors: string[] = [];
-  const convertedFiles: ConvertedFile[] = [];
-  const plannedFiles: PlannedGeneratedFile[] = [];
-  const pythonModuleMap: Map<string, PythonModuleEntry[]> | null =
+  const schemaMap = deduplicateSchemaExports(scanResult.schemas);
+  const schemasByFile = groupSchemasByFile(schemaMap);
+  const pythonModuleMap =
     generateInitFiles && (target === 'pydantic' || target === 'all') ? new Map() : null;
 
-  // Deduplicate schemas by export name (handle re-exports)
-  // Keep the first occurrence (original file, not re-export)
-  const schemaMap = new Map<string, SchemaExport>();
-  const schemaFiles = new Map<string, string>(); // exportName -> original file
+  const plan = planSchemaOutputs({
+    schemasByFile,
+    sourceDir: scanOptions.sourceDir,
+    resolvedOutDir,
+    target,
+    preserveStructure,
+    pythonModuleMap,
+    ...(options.enumStyle !== undefined && { enumStyle: options.enumStyle }),
+    ...(options.enumBaseType !== undefined && { enumBaseType: options.enumBaseType }),
+  });
 
-  for (const schema of scanResult.schemas) {
-    const key = schema.exportName;
-    if (!schemaMap.has(key)) {
-      schemaMap.set(key, schema);
-      schemaFiles.set(key, schema.file);
-    } else {
-      // If this is from a re-export file (index.ts), skip it
-      const originalFile = schemaFiles.get(key);
-      if (!originalFile) {
-        schemaMap.set(key, schema);
-        schemaFiles.set(key, schema.file);
-        continue;
-      }
-      const isReExport =
-        path.basename(schema.file) === 'index.ts' || path.basename(schema.file) === 'index.js';
-      if (isReExport) {
-        // Skip re-exports
-        continue;
-      }
-      // If original was from index.ts and this is the actual file, replace it
-      if (
-        path.basename(originalFile) === 'index.ts' ||
-        path.basename(originalFile) === 'index.js'
-      ) {
-        schemaMap.set(key, schema);
-        schemaFiles.set(key, schema.file);
-      }
-    }
+  if (plan.errors.length > 0) {
+    return buildFailedConversionResult(scanResult, plan);
   }
 
-  // Group deduplicated schemas by file
-  const schemasByFile = new Map<string, SchemaExport[]>();
-  for (const schema of schemaMap.values()) {
-    const existing = schemasByFile.get(schema.file) || [];
-    existing.push(schema);
-    schemasByFile.set(schema.file, existing);
-  }
-
-  // Track used file names to handle collisions
-  const usedNames = new Map<string, number>();
-
-  // Convert each schema
-  for (const [sourceFile, schemas] of schemasByFile.entries()) {
-    if (schemas.length === 0) continue;
-
-    const relativePath = path.relative(scanOptions.sourceDir, sourceFile);
-
-    // Determine output path structure
-    let outputBasePath: string;
-    if (preserveStructure) {
-      // Mirror source structure
-      const relativeDir = path.dirname(relativePath);
-      const baseName = path.basename(sourceFile, path.extname(sourceFile));
-      outputBasePath = path.join(resolvedOutDir, relativeDir, baseName);
-    } else {
-      // Flat structure: just use outDir
-      outputBasePath = resolvedOutDir;
-    }
-
-    // Convert each schema in the file
-    for (const schemaExport of schemas) {
-      const targets: Target[] = target === 'all' ? ['pydantic', 'typescript'] : [target];
-
-      for (const t of targets) {
-        try {
-          const convertOptions: Parameters<typeof convertSchema>[2] = {
-            preserveStructure,
-            outputBasePath,
-            sourceFile,
-            outDir: resolvedOutDir,
-            usedNames,
-          };
-          if (options.enumStyle !== undefined) {
-            convertOptions.enumStyle = options.enumStyle;
-          }
-          if (options.enumBaseType !== undefined) {
-            convertOptions.enumBaseType = options.enumBaseType;
-          }
-          const output = convertSchema(schemaExport, t, convertOptions);
-
-          const outputPath = output.path;
-
-          plannedFiles.push({
-            path: outputPath,
-            content: output.content,
-            target: t,
-          });
-
-          if (pythonModuleMap && t === 'pydantic') {
-            recordPythonModule(pythonModuleMap, outputPath, output.symbolName);
-          }
-
-          convertedFiles.push({
-            path: outputPath,
-            sourceFile,
-            exportName: schemaExport.exportName,
-            target: t,
-          });
-        } catch (err) {
-          const message = err instanceof Error ? err.message : String(err);
-          allErrors.push(
-            `Failed to convert ${schemaExport.exportName} from ${sourceFile}: ${message}`,
-          );
-        }
-      }
-    }
-  }
-
-  if (pythonModuleMap) {
-    const initFiles = buildInitFiles(resolvedOutDir, pythonModuleMap);
-    for (const initFile of initFiles) {
-      plannedFiles.push({
-        path: initFile.path,
-        content: initFile.content,
-        target: 'pydantic',
-      });
-    }
-  }
-
-  if (allErrors.length > 0) {
-    return {
-      files: convertedFiles,
-      warnings: allWarnings,
-      skippedFiles: allSkipped,
-      errors: allErrors,
-      written: 0,
-      unchanged: 0,
-      deleted: 0,
-      outOfDate: 0,
-    };
-  }
-
-  const syncResult = await syncGeneratedFiles(plannedFiles, {
+  const syncResult = await syncGeneratedFiles(plan.plannedFiles, {
     outDir: resolvedOutDir,
     target,
     clean,
     verify,
   });
 
+  applySyncActions(plan.convertedFiles, syncResult);
+
+  return {
+    files: plan.convertedFiles,
+    warnings: scanResult.warnings,
+    skippedFiles: scanResult.skippedFiles,
+    errors: plan.errors,
+    written: syncResult.written,
+    unchanged: syncResult.unchanged,
+    deleted: syncResult.deleted,
+    outOfDate: syncResult.outOfDate,
+  };
+}
+
+function buildFailedConversionResult(
+  scanResult: { warnings: string[]; skippedFiles: string[] },
+  plan: { convertedFiles: ConvertedFile[]; errors: string[] },
+): ConvertFolderResult {
+  return {
+    files: plan.convertedFiles,
+    warnings: scanResult.warnings,
+    skippedFiles: scanResult.skippedFiles,
+    errors: plan.errors,
+    written: 0,
+    unchanged: 0,
+    deleted: 0,
+    outOfDate: 0,
+  };
+}
+
+function deduplicateSchemaExports(schemas: SchemaExport[]): Map<string, SchemaExport> {
+  const schemaMap = new Map<string, SchemaExport>();
+  const schemaFiles = new Map<string, string>();
+
+  for (const schema of schemas) {
+    const key = schema.exportName;
+    if (!schemaMap.has(key)) {
+      schemaMap.set(key, schema);
+      schemaFiles.set(key, schema.file);
+      continue;
+    }
+
+    const originalFile = schemaFiles.get(key);
+    if (!originalFile) {
+      schemaMap.set(key, schema);
+      schemaFiles.set(key, schema.file);
+      continue;
+    }
+
+    if (isIndexFile(schema.file)) {
+      continue;
+    }
+
+    if (isIndexFile(originalFile)) {
+      schemaMap.set(key, schema);
+      schemaFiles.set(key, schema.file);
+    }
+  }
+
+  return schemaMap;
+}
+
+function isIndexFile(filePath: string): boolean {
+  const baseName = path.basename(filePath);
+  return baseName === 'index.ts' || baseName === 'index.js';
+}
+
+function groupSchemasByFile(schemaMap: Map<string, SchemaExport>): Map<string, SchemaExport[]> {
+  const schemasByFile = new Map<string, SchemaExport[]>();
+  for (const schema of schemaMap.values()) {
+    const existing = schemasByFile.get(schema.file) ?? [];
+    existing.push(schema);
+    schemasByFile.set(schema.file, existing);
+  }
+  return schemasByFile;
+}
+
+interface PlanSchemaOutputsOptions {
+  schemasByFile: Map<string, SchemaExport[]>;
+  sourceDir: string;
+  resolvedOutDir: string;
+  target: Target | 'all';
+  preserveStructure: boolean;
+  enumStyle?: 'enum' | 'literal';
+  enumBaseType?: 'str' | 'int';
+  pythonModuleMap: Map<string, PythonModuleEntry[]> | null;
+}
+
+interface PlanSchemaOutputsResult {
+  plannedFiles: PlannedGeneratedFile[];
+  convertedFiles: ConvertedFile[];
+  errors: string[];
+}
+
+function planSchemaOutputs(options: PlanSchemaOutputsOptions): PlanSchemaOutputsResult {
+  const plannedFiles: PlannedGeneratedFile[] = [];
+  const convertedFiles: ConvertedFile[] = [];
+  const errors: string[] = [];
+  const usedNames = new Map<string, number>();
+
+  for (const [sourceFile, schemas] of options.schemasByFile.entries()) {
+    planOutputsForSourceFile(
+      sourceFile,
+      schemas,
+      options,
+      usedNames,
+      plannedFiles,
+      convertedFiles,
+      errors,
+    );
+  }
+
+  appendInitFiles(options.resolvedOutDir, options.pythonModuleMap, plannedFiles);
+
+  return { plannedFiles, convertedFiles, errors };
+}
+
+function planOutputsForSourceFile(
+  sourceFile: string,
+  schemas: SchemaExport[],
+  options: PlanSchemaOutputsOptions,
+  usedNames: Map<string, number>,
+  plannedFiles: PlannedGeneratedFile[],
+  convertedFiles: ConvertedFile[],
+  errors: string[],
+): void {
+  if (schemas.length === 0) return;
+
+  const relativePath = path.relative(options.sourceDir, sourceFile);
+  const outputBasePath = resolveOutputBasePath({
+    preserveStructure: options.preserveStructure,
+    relativePath,
+    sourceFile,
+    resolvedOutDir: options.resolvedOutDir,
+  });
+
+  for (const schemaExport of schemas) {
+    const targets: Target[] =
+      options.target === 'all' ? ['pydantic', 'typescript'] : [options.target];
+    for (const t of targets) {
+      planSingleSchemaOutput({
+        schemaExport,
+        target: t,
+        sourceFile,
+        outputBasePath,
+        preserveStructure: options.preserveStructure,
+        resolvedOutDir: options.resolvedOutDir,
+        usedNames,
+        pythonModuleMap: options.pythonModuleMap,
+        plannedFiles,
+        convertedFiles,
+        errors,
+        ...(options.enumStyle !== undefined && { enumStyle: options.enumStyle }),
+        ...(options.enumBaseType !== undefined && { enumBaseType: options.enumBaseType }),
+      });
+    }
+  }
+}
+
+function appendInitFiles(
+  resolvedOutDir: string,
+  pythonModuleMap: Map<string, PythonModuleEntry[]> | null,
+  plannedFiles: PlannedGeneratedFile[],
+): void {
+  if (!pythonModuleMap) return;
+
+  const initFiles = buildInitFiles(resolvedOutDir, pythonModuleMap);
+  for (const initFile of initFiles) {
+    plannedFiles.push({
+      path: initFile.path,
+      content: initFile.content,
+      target: 'pydantic',
+    });
+  }
+}
+
+function resolveOutputBasePath(options: {
+  preserveStructure: boolean;
+  relativePath: string;
+  sourceFile: string;
+  resolvedOutDir: string;
+}): string {
+  if (options.preserveStructure) {
+    const relativeDir = path.dirname(options.relativePath);
+    const baseName = path.basename(options.sourceFile, path.extname(options.sourceFile));
+    return path.join(options.resolvedOutDir, relativeDir, baseName);
+  }
+  return options.resolvedOutDir;
+}
+
+function planSingleSchemaOutput(options: {
+  schemaExport: SchemaExport;
+  target: Target;
+  sourceFile: string;
+  outputBasePath: string;
+  preserveStructure: boolean;
+  resolvedOutDir: string;
+  usedNames: Map<string, number>;
+  enumStyle?: 'enum' | 'literal';
+  enumBaseType?: 'str' | 'int';
+  pythonModuleMap: Map<string, PythonModuleEntry[]> | null;
+  plannedFiles: PlannedGeneratedFile[];
+  convertedFiles: ConvertedFile[];
+  errors: string[];
+}): void {
+  try {
+    const convertOptions: Parameters<typeof convertSchema>[2] = {
+      preserveStructure: options.preserveStructure,
+      outputBasePath: options.outputBasePath,
+      sourceFile: options.sourceFile,
+      outDir: options.resolvedOutDir,
+      usedNames: options.usedNames,
+      ...(options.enumStyle !== undefined && { enumStyle: options.enumStyle }),
+      ...(options.enumBaseType !== undefined && { enumBaseType: options.enumBaseType }),
+    };
+    const output = convertSchema(options.schemaExport, options.target, convertOptions);
+
+    options.plannedFiles.push({
+      path: output.path,
+      content: output.content,
+      target: options.target,
+    });
+
+    if (options.pythonModuleMap && options.target === 'pydantic') {
+      recordPythonModule(options.pythonModuleMap, output.path, output.symbolName);
+    }
+
+    options.convertedFiles.push({
+      path: output.path,
+      sourceFile: options.sourceFile,
+      exportName: options.schemaExport.exportName,
+      target: options.target,
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    options.errors.push(
+      `Failed to convert ${options.schemaExport.exportName} from ${options.sourceFile}: ${message}`,
+    );
+  }
+}
+
+function applySyncActions(
+  convertedFiles: ConvertedFile[],
+  syncResult: SyncGeneratedFilesResult,
+): void {
   for (const file of convertedFiles) {
     const action = syncResult.actionByPath.get(path.resolve(file.path));
     if (action !== undefined) {
       file.action = action;
     }
   }
-
-  return {
-    files: convertedFiles,
-    warnings: allWarnings,
-    skippedFiles: allSkipped,
-    errors: allErrors,
-    written: syncResult.written,
-    unchanged: syncResult.unchanged,
-    deleted: syncResult.deleted,
-    outOfDate: syncResult.outOfDate,
-  };
 }
 
 function convertSchema(
@@ -325,13 +433,9 @@ function convertSchema(
   const conversionOptions: Parameters<typeof convertZodToPydantic>[1] = {
     name: className,
     sourceModule: schemaExport.file,
+    ...(enumStyle !== undefined && { enumStyle }),
+    ...(enumBaseType !== undefined && { enumBaseType }),
   };
-  if (enumStyle !== undefined) {
-    conversionOptions.enumStyle = enumStyle;
-  }
-  if (enumBaseType !== undefined) {
-    conversionOptions.enumBaseType = enumBaseType;
-  }
 
   const content =
     target === 'pydantic'
@@ -406,45 +510,55 @@ async function findStaleGeneratedFiles(
   const staleFiles: string[] = [];
 
   async function walk(currentDir: string): Promise<void> {
-    let entries: Dirent[];
-    try {
-      entries = (await fs.readdir(currentDir, { withFileTypes: true })).sort((a, b) =>
-        compareLexicographic(a.name, b.name),
-      );
-    } catch (err) {
-      if (isNodeError(err) && err.code === 'ENOENT') {
-        return;
-      }
-      throw err;
-    }
-
+    const entries = await readDirectoryEntries(currentDir);
     for (const entry of entries) {
-      const entryPath = path.join(currentDir, entry.name);
-      if (entry.isDirectory()) {
-        await walk(entryPath);
-        continue;
-      }
-      if (!entry.isFile()) {
-        continue;
-      }
-
-      const resolvedPath = path.resolve(entryPath);
-      if (plannedPaths.has(resolvedPath)) {
-        continue;
-      }
-      if (!isCleanCandidatePath(resolvedPath, target)) {
-        continue;
-      }
-
-      const content = await readTextFileIfExists(resolvedPath);
-      if (content !== undefined && hasGeneratedMarker(resolvedPath, content)) {
-        staleFiles.push(resolvedPath);
-      }
+      await collectStaleFileIfNeeded(entry, currentDir, plannedPaths, target, staleFiles, walk);
     }
   }
 
   await walk(outDir);
   return staleFiles;
+}
+
+async function readDirectoryEntries(currentDir: string): Promise<Dirent[]> {
+  try {
+    return (await fs.readdir(currentDir, { withFileTypes: true })).sort((a, b) =>
+      compareLexicographic(a.name, b.name),
+    );
+  } catch (err) {
+    if (isNodeError(err) && err.code === 'ENOENT') {
+      return [];
+    }
+    throw err;
+  }
+}
+
+async function collectStaleFileIfNeeded(
+  entry: Dirent,
+  currentDir: string,
+  plannedPaths: Set<string>,
+  target: Target | 'all',
+  staleFiles: string[],
+  walk: (dir: string) => Promise<void>,
+): Promise<void> {
+  const entryPath = path.join(currentDir, entry.name);
+  if (entry.isDirectory()) {
+    await walk(entryPath);
+    return;
+  }
+  if (!entry.isFile()) {
+    return;
+  }
+
+  const resolvedPath = path.resolve(entryPath);
+  if (plannedPaths.has(resolvedPath) || !isCleanCandidatePath(resolvedPath, target)) {
+    return;
+  }
+
+  const content = await readTextFileIfExists(resolvedPath);
+  if (content !== undefined && hasGeneratedMarker(resolvedPath, content)) {
+    staleFiles.push(resolvedPath);
+  }
 }
 
 function isCleanCandidatePath(filePath: string, target: Target | 'all'): boolean {
@@ -633,9 +747,15 @@ function toPascalCase(str: string): string {
 }
 
 function toSnakeCase(str: string): string {
-  return str
+  let result = str
     .replace(/([a-z])([A-Z])/g, '$1_$2')
     .replace(/[^a-zA-Z0-9]+/g, '_')
-    .toLowerCase()
-    .replace(/^_+|_+$/g, '');
+    .toLowerCase();
+  while (result.startsWith('_')) {
+    result = result.slice(1);
+  }
+  while (result.endsWith('_')) {
+    result = result.slice(0, -1);
+  }
+  return result;
 }
