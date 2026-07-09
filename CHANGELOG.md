@@ -9,6 +9,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - More examples and recipes
 
+## [0.4.0] – 2026-07-09
+
+### Added
+
+- Added write-if-changed behavior for generated files.
+- Added `clean` / `--clean` for removing stale marked SchemaBridge outputs.
+- Added `verify` / `--verify` for CI checks without writing files.
+- Added sync counts for written, unchanged, deleted, and out-of-date files.
+
+### Changed
+
+- Made folder scanning and generated `__init__.py` output deterministic.
+- Added generated-file markers and normalized generated output to LF with one final newline.
+- Updated `generateFilesFromZod()` to report `written` or `unchanged`.
+- Removed unused direct dependencies and stopped tracking generated example outputs.
+
+### Fixed
+
+- Treated primitive Zod object-shape values as literals instead of invalid schemas.
+- Preserved null literal values from Zod 3-style literal definitions.
+
 ## [0.3.2] – 2026-04-16
 
 ### Fixed
