@@ -1,7 +1,7 @@
 {
   "name": "@schemabridge/docs",
   "type": "module",
-  "version": "0.3.2",
+  "version": "0.4.0",
   "scripts": {
     "dev": "pnpm --filter @schemabridge/core build:lib && astro dev",
     "build": "pnpm --filter @schemabridge/core build:lib && astro build",
