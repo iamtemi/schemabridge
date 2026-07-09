@@ -3,8 +3,8 @@
   "type": "module",
   "version": "0.3.2",
   "scripts": {
-    "dev": "astro dev",
-    "build": "astro build",
+    "dev": "pnpm --filter @schemabridge/core build:lib && astro dev",
+    "build": "pnpm --filter @schemabridge/core build:lib && astro build",
     "preview": "astro preview",
     "astro": "astro"
   },

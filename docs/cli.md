@@ -13,6 +13,7 @@ schemabridge convert zod schema.ts --export userSchema --to pydantic --out user.
 
 - `--to typescript` for `.d.ts`
 - `--to all` for both
+- Re-running the same command skips output files that are already correct.
 
 ## Whole folder
 
@@ -30,36 +31,7 @@ Generated files include a marker comment. `--clean` only deletes stale files wit
 
 ## Schema Types Supported
 
-SchemaBridge supports converting any Zod schema type as a root schema:
-
-- **Objects** (`z.object()`) → Pydantic models / TypeScript interfaces
-- **Enums** (`z.enum()`) → Enum classes / union types
-- **Unions** (`z.union()`) → Type aliases
-- **Primitives** (`z.string()`, `z.number()`, `z.ipv4()`, etc.) → Type aliases
-- **Arrays** (`z.array()`) → Type aliases
-
-**Examples:**
-
-```ts
-// Objects
-export const userSchema = z.object({ id: z.string() });
-// → class UserSchema(BaseModel): ...
-
-// Enums
-export const role = z.enum(['admin', 'viewer']);
-// → class RoleEnum(str, Enum): ... (Pydantic)
-// → export type RoleEnum = "admin" | "viewer" (TypeScript)
-
-// Unions
-export const dateTypes = z.union([z.date(), z.iso.date()]);
-// → type DateTypes = Union[date, date] (Pydantic)
-// → export type DateTypes = Date | string (TypeScript)
-
-// Primitives
-export const ipv4 = z.ipv4();
-// → type Ipv4 = IPv4Address (Pydantic)
-// → export type Ipv4 = string (TypeScript)
-```
+SchemaBridge supports objects, enums, unions, primitives, and arrays as root schemas. See [Root Schema Types](api.md#root-schema-types) for examples.
 
 **Enum Options:**
 
@@ -82,7 +54,7 @@ export const ipv4 = z.ipv4();
 ## Notes on Zod v4
 
 - Prefer direct helpers: `z.date()`, `z.coerce.date()`, `z.string().uuid()`, `z.string().email()`.
-- Avoid deprecated `z.string().datetime()`; if you need ISO datetime, use `z.string().datetime()` in v4 or `z.coerce.date()` if you want Date objects.
+- Use `z.coerce.date()` when you want Python `datetime` / TypeScript `Date` output. Use string datetime helpers only when you want string output.
 
 ## Example (monorepo)
 
@@ -95,4 +67,4 @@ schemabridge convert folder ./packages/schemas \
 
 Then in Python: `from services.api.models.user import UserSchema`
 
-Hook it into CI/build to keep models current.\*\*\*
+Hook it into CI/build to keep models current.

@@ -184,6 +184,8 @@ This is correct Pydantic behavior, but may differ from Zod's runtime behavior in
 await convertFolder({
   sourceDir: './src',
   outDir: './generated',
+  target: 'pydantic',
+  trustedInput: true,
   ignore: ['node_modules', 'dist', 'tests'],
 });
 ```

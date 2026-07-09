@@ -4,7 +4,6 @@
  * Main entry point for programmatic API usage.
  */
 
-import fs from 'node:fs/promises';
 import path from 'node:path';
 import type { ZodType } from 'zod';
 import {
@@ -18,6 +17,7 @@ import {
   emitTypeScriptTypeAlias,
 } from './core/emitters/typescript.js';
 import { visitZodSchema } from './core/ast/zod-visitor.js';
+import { writeGeneratedFileIfChanged, type GeneratedWriteAction } from './core/generated-files.js';
 export { loadZodSchema, SchemaLoadError } from './core/loader/index.js';
 export {
   scanFolderForSchemas,
@@ -178,16 +178,18 @@ export interface GenerateFilesFromZodOptions extends SchemaConversionOptions {
 }
 
 export interface GeneratedFile {
-  /** Absolute or resolved path written to disk. */
+  /** Absolute or resolved output path. */
   path: string;
   /** Target type for this file ("pydantic" or "typescript"). */
   target: Target;
+  /** Whether this run wrote the file or found it already current. */
+  action?: GeneratedWriteAction;
 }
 
 /**
  * High-level helper that mirrors the CLI behavior and writes files to disk.
  * - Accepts a target and `out` path that follow the same rules as the CLI.
- * - Returns metadata about the files that were written.
+ * - Returns metadata about the files that were written or already current.
  */
 export function generateFilesFromZod(
   options: GenerateFilesFromZodOptions,
@@ -228,9 +230,8 @@ export function generateFilesFromZod(
         ? convertZodToPydantic(schema, rest)
         : convertZodToTypescript(schema, rest);
 
-    await fs.mkdir(path.dirname(outSpec.path), { recursive: true });
-    await fs.writeFile(outSpec.path, content, 'utf8');
-    return { path: outSpec.path, target: outSpec.target };
+    const action = await writeGeneratedFileIfChanged(outSpec.path, content, outSpec.target);
+    return { path: outSpec.path, target: outSpec.target, action };
   });
 
   return Promise.all(writes);

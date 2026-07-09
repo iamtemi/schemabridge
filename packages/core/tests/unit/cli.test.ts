@@ -98,6 +98,39 @@ describe('CLI runCLI', () => {
     expect(tsContent).toContain('export interface UserSchema');
   });
 
+  it('reports unchanged for single-file output that is already current', async () => {
+    const tmp = await makeTempDir();
+    const outPath = path.join(tmp, 'model.py');
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+
+    const first = await runCLI([
+      'convert',
+      'zod',
+      fixture,
+      '--export',
+      'userSchema',
+      '--to',
+      'pydantic',
+      '--out',
+      outPath,
+    ]);
+    const second = await runCLI([
+      'convert',
+      'zod',
+      fixture,
+      '--export',
+      'userSchema',
+      '--to',
+      'pydantic',
+      '--out',
+      outPath,
+    ]);
+
+    expect(first).toBe(0);
+    expect(second).toBe(0);
+    expect(logSpy).toHaveBeenCalledWith(`Unchanged pydantic: ${outPath}`);
+  });
+
   it('defaults to pydantic when --to is omitted', async () => {
     const tmp = await makeTempDir();
     const outPath = path.join(tmp, 'default');

@@ -163,6 +163,7 @@ await convertFolder({
   target: 'pydantic',
   preserveStructure: true,
   generateInitFiles: true,
+  trustedInput: true,
 });
 ```
 

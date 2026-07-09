@@ -135,7 +135,7 @@ export function emitPydanticTypeAlias(root: SchemaNode, options: EmitPydanticOpt
     if (ctx.renderedPaths.has(pathKey)) return;
     ctx.renderedPaths.add(pathKey);
 
-    const fallbackName = objPath[objPath.length - 1] ?? typeName;
+    const fallbackName = objPath.at(-1) ?? typeName;
     const className = getNameForPath(pathKey, fallbackName, ctx, objPath, typeName);
     objectBlocks.push(renderObject(objNode, className, ctx, objPath));
   });
@@ -174,7 +174,7 @@ function renderObject(
       ctx.renderedPaths.add(pathKey);
       const nestedName = getNameForPath(
         pathKey,
-        objPath[objPath.length - 1] ?? 'Model',
+        objPath.at(-1) ?? 'Model',
         ctx,
         objPath,
         className,
@@ -359,7 +359,7 @@ function buildType(
       }
 
       // enumStyle === 'enum': generate or reference enum class
-      const key = node.values.slice().sort().join('|');
+      const key = node.values.slice().sort(compareLexicographic).join('|');
       const existingEnum = ctx.enumClasses.get(key);
 
       if (existingEnum) {
@@ -369,7 +369,7 @@ function buildType(
 
       // Generate new enum class
       const enumPathKey = path.length > 0 ? `${path.join('.')}.Enum` : 'Enum';
-      const lastPathSegment = path[path.length - 1];
+      const lastPathSegment = path.at(-1);
       const enumName = getNameForPath(
         enumPathKey,
         lastPathSegment ? `${toPascalCase(lastPathSegment)}Enum` : 'Enum',
@@ -416,7 +416,7 @@ function buildType(
     case 'object': {
       const className = getNameForPath(
         path.join('.'),
-        path[path.length - 1] ?? currentClass,
+        path.at(-1) ?? currentClass,
         ctx,
         path,
         currentClass,
@@ -524,10 +524,10 @@ function registerRegex(regex: RegExp | string, path: string[], ctx: EmitContext)
 
   // Check for unmapped regex flags and warn
   if (typeof regex === 'object' && regex instanceof RegExp) {
-    const mappedFlags = ['i', 'm', 's'];
+    const mappedFlags = new Set(['i', 'm', 's']);
     const unmappedFlags = regex.flags
       .split('')
-      .filter((flag) => !mappedFlags.includes(flag) && flag !== 'u' && flag !== 'g');
+      .filter((flag) => !mappedFlags.has(flag) && flag !== 'u' && flag !== 'g');
     if (unmappedFlags.length > 0) {
       ctx.warnings.push({
         code: 'unsupported_effect',
@@ -589,12 +589,12 @@ function buildRegexConstants(ctx: EmitContext): string {
 function buildImports(ctx: EmitContext): string {
   const lines: string[] = [];
 
-  const pydanticImports = Array.from(ctx.pydanticImports).sort();
+  const pydanticImports = Array.from(ctx.pydanticImports).sort(compareLexicographic);
   if (pydanticImports.length) {
     lines.push(`from pydantic import ${pydanticImports.join(', ')}`);
   }
 
-  const typingImports = Array.from(ctx.typingImports).sort();
+  const typingImports = Array.from(ctx.typingImports).sort(compareLexicographic);
   if (typingImports.length) {
     lines.push(`from typing import ${typingImports.join(', ')}`);
   }
@@ -650,9 +650,9 @@ function toEnumMemberName(value: string): string {
   return (
     value
       .toUpperCase()
-      .replace(/[^A-Z0-9_]/g, '_')
-      .replace(/_+/g, '_')
-      .replace(/^_+|_+$/g, '') || 'VALUE'
+      .replaceAll(/[^A-Z0-9_]/g, '_')
+      .replaceAll(/_+/g, '_')
+      .replaceAll(/^_+|_+$/g, '') || 'VALUE'
   );
 }
 
@@ -685,14 +685,13 @@ function pythonLiteral(value: unknown): string {
 
 function pythonString(value: string): string {
   const escaped = value
-    .replace(/\\/g, '\\\\')
-    .replace(/\r/g, '\\r')
-    .replace(/\n/g, '\\n')
-    .replace(/\t/g, '\\t')
-    .split('\b')
-    .join('\\b')
-    .replace(/\f/g, '\\f')
-    .replace(/"/g, '\\"');
+    .replaceAll('\\', '\\\\')
+    .replaceAll('\r', String.raw`\r`)
+    .replaceAll('\n', String.raw`\n`)
+    .replaceAll('\t', String.raw`\t`)
+    .replaceAll('\b', String.raw`\b`)
+    .replaceAll('\f', String.raw`\f`)
+    .replaceAll('"', String.raw`\"`);
   return `"${escaped}"`;
 }
 
@@ -702,7 +701,7 @@ function pythonRawString(value: string): string {
   if (value.endsWith('\\') || /[\r\n]/.test(value)) {
     return pythonString(value);
   }
-  const escaped = value.replace(/"/g, '\\"');
+  const escaped = value.replaceAll('"', String.raw`\"`);
   return `r"${escaped}"`;
 }
 
@@ -712,9 +711,9 @@ function sanitizePythonIdentifier(name: string): { name: string; alias?: string 
     return { name };
   }
   const sanitized = name
-    .replace(/[^A-Za-z0-9_]/g, '_')
-    .replace(/^[^A-Za-z_]+/, (m) => `_${m}`)
-    .replace(/_+/g, '_');
+    .replaceAll(/[^A-Za-z0-9_]/g, '_')
+    .replaceAll(/^[^A-Za-z_]+/g, (m) => `_${m}`)
+    .replaceAll(/_+/g, '_');
   return { name: sanitized || '_field', alias: name };
 }
 
@@ -726,7 +725,7 @@ function buildFieldWithAlias(
   const aliasArg = `alias=${pythonString(alias)}`;
 
   if (baseDefault?.startsWith('Field(')) {
-    const inner = baseDefault.slice('Field('.length, baseDefault.length - 1).trim();
+    const inner = baseDefault.slice('Field('.length, -1).trim();
     const args = inner ? [aliasArg, inner] : [aliasArg];
     return `Field(${args.join(', ')})`;
   }
@@ -796,9 +795,15 @@ function toPascalCase(value: string): string {
 
 function toConstantName(value: string): string {
   return value
-    .replace(/[^a-zA-Z0-9]+/g, '_')
-    .replace(/([a-z0-9])([A-Z])/g, '$1_$2')
+    .replaceAll(/[^a-zA-Z0-9]+/g, '_')
+    .replaceAll(/([a-z0-9])([A-Z])/g, '$1_$2')
     .toUpperCase();
+}
+
+function compareLexicographic(a: string, b: string): number {
+  if (a < b) return -1;
+  if (a > b) return 1;
+  return 0;
 }
 
 function collectObjectNodes(

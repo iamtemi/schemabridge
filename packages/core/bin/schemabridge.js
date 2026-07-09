@@ -1,10 +1,9 @@
 #!/usr/bin/env node
-import { fileURLToPath as Pn } from 'node:url';
+import { fileURLToPath as An } from 'node:url';
 import z from 'node:path';
-import fe from 'node:process';
-import Ae from 'node:fs/promises';
-import C from 'node:path';
-function he(e, n) {
+import ve from 'node:process';
+import P from 'node:path';
+function ke(e, n) {
   let t = {
       typingImports: new Set(),
       pydanticImports: new Set(['BaseModel']),
@@ -26,27 +25,27 @@ function he(e, n) {
       enumStyle: n.enumStyle ?? 'enum',
       enumBaseType: n.enumBaseType ?? 'str',
     },
-    i = te(e, n.name, t, []),
-    r = xe(t),
-    o = ke(t),
-    s = Ne(t);
+    i = ie(e, n.name, t, []),
+    r = Ee(t),
+    o = Te(t),
+    s = Ce(t);
   return [r, o, s, i].filter(Boolean).join(`
 
 `);
 }
-function ve(e, n) {
+function xe(e, n) {
   if (e.type !== 'enum')
     throw new Error('Root schema must be an enum to generate Pydantic Enum class.');
   if ((n.enumStyle ?? 'enum') === 'literal') {
-    let o = e.values.map((s) => P(s));
+    let o = e.values.map((s) => C(s));
     return ['from typing import Literal', '', `type ${F(n.name)} = Literal[${o.join(', ')}]`].join(`
 `);
   }
   let i = F(n.name);
-  return ['from enum import Enum', '', Se(i, e.values, n.enumBaseType ?? 'str')].join(`
+  return ['from enum import Enum', '', $e(i, e.values, n.enumBaseType ?? 'str')].join(`
 `);
 }
-function we(e, n) {
+function Se(e, n) {
   let t = {
       typingImports: new Set(),
       pydanticImports: new Set(['BaseModel']),
@@ -71,35 +70,35 @@ function we(e, n) {
     i = F(n.name),
     r = V(e, t, [], i),
     o = [];
-  _(e, [], (c, m) => {
+  Z(e, [], (c, m) => {
     let d = m.join('.');
     if (t.renderedPaths.has(d)) return;
     t.renderedPaths.add(d);
-    let f = m[m.length - 1] ?? i,
-      h = B(d, f, t, m, i);
-    o.push(te(c, h, t, m));
+    let f = m.at(-1) ?? i,
+      h = _(d, f, t, m, i);
+    o.push(ie(c, h, t, m));
   });
-  let s = xe(t),
-    a = ke(t),
-    u = Ne(t);
+  let s = Ee(t),
+    a = Te(t),
+    u = Ce(t);
   return [s, a, u, ...o, `type ${i} = ${r.annotation}`].filter(Boolean).join(`
 
 `);
 }
-function te(e, n, t, i) {
+function ie(e, n, t, i) {
   if (e.type !== 'object') throw new Error(`Cannot render non-object node as class "${n}"`);
-  let r = B(i.join('.') || n, n, t, i),
+  let r = _(i.join('.') || n, n, t, i),
     o = [];
   for (let [l, c] of Object.entries(e.fields))
-    _(c, [...i, l], (m, d) => {
+    Z(c, [...i, l], (m, d) => {
       let f = d.join('.');
       if (t.renderedPaths.has(f)) return;
       t.renderedPaths.add(f);
-      let h = B(f, d[d.length - 1] ?? 'Model', t, d, n);
-      o.push(te(m, h, t, d));
+      let h = _(f, d.at(-1) ?? 'Model', t, d, n);
+      o.push(ie(m, h, t, d));
     });
   let s = [];
-  for (let [l, c] of Object.entries(e.fields)) s.push(Be(l, c, t, [...i, l], n));
+  for (let [l, c] of Object.entries(e.fields)) s.push(Ue(l, c, t, [...i, l], n));
   let a = (l) => (l.length === 0 ? '' : `    ${l}`),
     u = [];
   for (let l of [...o, ...(s.length ? s : ['pass'])])
@@ -117,29 +116,29 @@ function te(e, n, t, i) {
   return [`class ${r}(BaseModel):`, ...u].join(`
 `);
 }
-function Be(e, n, t, i, r) {
+function Ue(e, n, t, i, r) {
   let { annotation: o, defaultCode: s, optional: a } = V(n, t, i, r),
-    { name: u, alias: l } = qe(e),
+    { name: u, alias: l } = Je(e),
     c = s;
   return (
-    l && ((c = Ke(c, l, a ?? !1)), t.pydanticImports.add('Field')),
+    l && ((c = Ye(c, l, a ?? !1)), t.pydanticImports.add('Field')),
     c !== void 0 ? `${u}: ${o} = ${c}` : `${u}: ${o}`
   );
 }
 function V(e, n, t, i) {
-  let { inner: r, optional: o, nullable: s, defaultValue: a } = be(e),
-    u = De(r, n, t, i),
+  let { inner: r, optional: o, nullable: s, defaultValue: a } = Ne(e),
+    u = ze(r, n, t, i),
     l = u.annotation;
   (s && (n.typingImports.add('Optional'), (l = `Optional[${l}]`)),
     o && (n.typingImports.add('Optional'), (l = `Optional[${l}]`)));
   let c = { annotation: l };
   return a !== void 0
-    ? ((c.defaultCode = Ue(a, n)), c)
+    ? ((c.defaultCode = We(a, n)), c)
     : o
       ? ((c.defaultCode = 'None'), c)
       : (u.defaultCode !== void 0 && (c.defaultCode = u.defaultCode), (c.optional = o), c);
 }
-function De(e, n, t, i) {
+function ze(e, n, t, i) {
   switch (e.type) {
     case 'string': {
       let r = e.constraints;
@@ -153,7 +152,7 @@ function De(e, n, t, i) {
               r.maxLength !== void 0 && o.push(`max_length=${r.maxLength}`)),
           r.regex !== void 0)
         ) {
-          let s = ze(r.regex, t, n);
+          let s = Ge(r.regex, t, n);
           o.push(`pattern=${s}`);
         }
         return { annotation: `constr(${o.join(', ')})` };
@@ -163,13 +162,13 @@ function De(e, n, t, i) {
     case 'number': {
       let r = e.constraints;
       return r
-        ? (n.pydanticImports.add('confloat'), { annotation: `confloat(${ge(r).join(', ')})` })
+        ? (n.pydanticImports.add('confloat'), { annotation: `confloat(${we(r).join(', ')})` })
         : { annotation: 'float' };
     }
     case 'int': {
       let r = e.constraints;
       n.pydanticImports.add('conint');
-      let o = r ? ge(r) : [];
+      let o = r ? we(r) : [];
       return { annotation: o.length ? `conint(${o.join(', ')})` : 'conint()' };
     }
     case 'boolean':
@@ -194,19 +193,19 @@ function De(e, n, t, i) {
       if (n.enumStyle === 'literal')
         return (
           n.typingImports.add('Literal'),
-          { annotation: `Literal[${e.values.map((m) => P(m)).join(', ')}]` }
+          { annotation: `Literal[${e.values.map((m) => C(m)).join(', ')}]` }
         );
-      let r = e.values.slice().sort().join('|'),
+      let r = e.values.slice().sort(re).join('|'),
         o = n.enumClasses.get(r);
       if (o) return { annotation: o.name };
       let s = t.length > 0 ? `${t.join('.')}.Enum` : 'Enum',
-        a = t[t.length - 1],
-        u = B(s, a ? `${F(a)}Enum` : 'Enum', n, [...t, 'Enum'], i),
+        a = t.at(-1),
+        u = _(s, a ? `${F(a)}Enum` : 'Enum', n, [...t, 'Enum'], i),
         l = { name: u, values: e.values, baseType: n.enumBaseType };
       return (n.enumClasses.set(r, l), n.enumClassesToRender.push(l), { annotation: u });
     }
     case 'literal':
-      return (n.typingImports.add('Literal'), { annotation: `Literal[${P(e.value)}]` });
+      return (n.typingImports.add('Literal'), { annotation: `Literal[${C(e.value)}]` });
     case 'array': {
       n.typingImports.add('List');
       let r = V(e.element, n, [...t, '[item]'], i),
@@ -221,7 +220,7 @@ function De(e, n, t, i) {
         }
       );
     case 'object':
-      return { annotation: B(t.join('.'), t[t.length - 1] ?? i, n, t, i) };
+      return { annotation: _(t.join('.'), t.at(-1) ?? i, n, t, i) };
     case 'any':
     case 'unknown':
       return (n.typingImports.add('Any'), { annotation: 'Any' });
@@ -231,7 +230,7 @@ function De(e, n, t, i) {
       return (n.typingImports.add('Any'), { annotation: 'Any' });
   }
 }
-function ge(e) {
+function we(e) {
   let n = [];
   return (
     e.min && n.push(`${e.min.inclusive ? 'ge' : 'gt'}=${e.min.value}`),
@@ -241,7 +240,7 @@ function ge(e) {
     n
   );
 }
-function be(e) {
+function Ne(e) {
   let n = e,
     t = !1,
     i = !1,
@@ -267,23 +266,23 @@ function be(e) {
   }
   return { inner: n, optional: t, nullable: i, defaultValue: r };
 }
-function Ue(e, n) {
+function We(e, n) {
   return (
     n.pydanticImports.add('Field'),
     Array.isArray(e)
       ? 'Field(default_factory=list)'
       : e && typeof e == 'object'
         ? 'Field(default_factory=dict)'
-        : `Field(default=${P(e)})`
+        : `Field(default=${C(e)})`
   );
 }
-function ze(e, n, t) {
-  let i = We(e),
+function Ge(e, n, t) {
+  let i = Ve(e),
     r = t.regexConstants.get(i);
   if (r) return r;
   if (typeof e == 'object' && e instanceof RegExp) {
-    let a = ['i', 'm', 's'],
-      u = e.flags.split('').filter((l) => !a.includes(l) && l !== 'u' && l !== 'g');
+    let a = new Set(['i', 'm', 's']),
+      u = e.flags.split('').filter((l) => !a.has(l) && l !== 'u' && l !== 'g');
     u.length > 0 &&
       t.warnings.push({
         code: 'unsupported_effect',
@@ -291,14 +290,14 @@ function ze(e, n, t) {
         message: `Regex flags "${u.join('')}" are not mapped to Python. Only i/m/s are embedded inline; u is default in Python, g is irrelevant.`,
       });
   }
-  let s = `${Ye([...n].pop() ?? 'pattern')}_REGEX`;
+  let s = `${Xe([...n].pop() ?? 'pattern')}_REGEX`;
   return (t.regexConstants.set(i, s), t.regexOrder.push(i), s);
 }
-function We(e) {
+function Ve(e) {
   return typeof e == 'string' ? e : `/${e.source}/${e.flags}`;
 }
-function Ve(e) {
-  if (typeof e == 'string') return ye(e);
+function qe(e) {
+  if (typeof e == 'string') return be(e);
   let n = e.flags
       .split('')
       .map((i) => {
@@ -315,23 +314,23 @@ function Ve(e) {
       })
       .join(''),
     t = n ? `(?${n})` : '';
-  return ye(t + e.source);
+  return be(t + e.source);
 }
-function ke(e) {
+function Te(e) {
   return e.regexOrder.length
     ? e.regexOrder.map((t) => {
         let i = e.regexConstants.get(t);
         if (!i) throw new Error(`Missing regex constant for key: ${t}`);
-        return `${i} = ${Ve(t.startsWith('/') ? new RegExp(t.slice(1, t.lastIndexOf('/')), t.slice(t.lastIndexOf('/') + 1)) : t)}`;
+        return `${i} = ${qe(t.startsWith('/') ? new RegExp(t.slice(1, t.lastIndexOf('/')), t.slice(t.lastIndexOf('/') + 1)) : t)}`;
       }).join(`
 `)
     : '';
 }
-function xe(e) {
+function Ee(e) {
   let n = [],
-    t = Array.from(e.pydanticImports).sort();
+    t = Array.from(e.pydanticImports).sort(re);
   t.length && n.push(`from pydantic import ${t.join(', ')}`);
-  let i = Array.from(e.typingImports).sort();
+  let i = Array.from(e.typingImports).sort(re);
   (i.length && n.push(`from typing import ${i.join(', ')}`),
     e.enumClassesToRender.length > 0 && n.push('from enum import Enum'));
   let r = [];
@@ -350,35 +349,35 @@ function xe(e) {
 `)
   );
 }
-function Se(e, n, t) {
+function $e(e, n, t) {
   let i = n.map((r) => {
-    let o = Ge(r),
-      s = L(r);
+    let o = Ke(r),
+      s = R(r);
     return `    ${o} = ${s}`;
   });
   return [`class ${e}(${t}, Enum):`, ...i].join(`
 `);
 }
-function Ne(e) {
+function Ce(e) {
   return e.enumClassesToRender.length === 0
     ? ''
-    : e.enumClassesToRender.map((n) => Se(n.name, n.values, n.baseType)).join(`
+    : e.enumClassesToRender.map((n) => $e(n.name, n.values, n.baseType)).join(`
 
 `);
 }
-function Ge(e) {
+function Ke(e) {
   return (
     e
       .toUpperCase()
-      .replace(/[^A-Z0-9_]/g, '_')
-      .replace(/_+/g, '_')
-      .replace(/^_+|_+$/g, '') || 'VALUE'
+      .replaceAll(/[^A-Z0-9_]/g, '_')
+      .replaceAll(/_+/g, '_')
+      .replaceAll(/^_+|_+$/g, '') || 'VALUE'
   );
 }
-function P(e) {
+function C(e) {
   switch (typeof e) {
     case 'string':
-      return L(e);
+      return R(e);
     case 'number':
       return Number.isFinite(e) ? e.toString() : 'None';
     case 'boolean':
@@ -389,38 +388,49 @@ function P(e) {
       return e === null
         ? 'None'
         : Array.isArray(e)
-          ? `[${e.map((n) => P(n)).join(', ')}]`
+          ? `[${e.map((n) => C(n)).join(', ')}]`
           : '{' +
             Object.entries(e)
-              .map(([n, t]) => `${L(n)}: ${P(t)}`)
+              .map(([n, t]) => `${R(n)}: ${C(t)}`)
               .join(', ') +
             '}';
     default:
       return 'None';
   }
 }
-function L(e) {
-  return `"${e.replace(/\\/g, '\\\\').replace(/\r/g, '\\r').replace(/\n/g, '\\n').replace(/\t/g, '\\t').split('\b').join('\\b').replace(/\f/g, '\\f').replace(/"/g, '\\"')}"`;
+function R(e) {
+  return `"${e
+    .replaceAll('\\', '\\\\')
+    .replaceAll('\r', String.raw`\r`)
+    .replaceAll(
+      `
+`,
+      String.raw`\n`,
+    )
+    .replaceAll('	', String.raw`\t`)
+    .replaceAll('\b', String.raw`\b`)
+    .replaceAll('\f', String.raw`\f`)
+    .replaceAll('"', String.raw`\"`)}"`;
 }
-function ye(e) {
-  return e.endsWith('\\') || /[\r\n]/.test(e) ? L(e) : `r"${e.replace(/"/g, '\\"')}"`;
+function be(e) {
+  return e.endsWith('\\') || /[\r\n]/.test(e) ? R(e) : `r"${e.replaceAll('"', String.raw`\"`)}"`;
 }
-function qe(e) {
+function Je(e) {
   return /^[A-Za-z_][A-Za-z0-9_]*$/.test(e)
     ? { name: e }
     : {
         name:
           e
-            .replace(/[^A-Za-z0-9_]/g, '_')
-            .replace(/^[^A-Za-z_]+/, (i) => `_${i}`)
-            .replace(/_+/g, '_') || '_field',
+            .replaceAll(/[^A-Za-z0-9_]/g, '_')
+            .replaceAll(/^[^A-Za-z_]+/g, (i) => `_${i}`)
+            .replaceAll(/_+/g, '_') || '_field',
         alias: e,
       };
 }
-function Ke(e, n, t) {
-  let i = `alias=${L(n)}`;
+function Ye(e, n, t) {
+  let i = `alias=${R(n)}`;
   if (e?.startsWith('Field(')) {
-    let r = e.slice(6, e.length - 1).trim();
+    let r = e.slice(6, -1).trim();
     return `Field(${(r ? [i, r] : [i]).join(', ')})`;
   }
   return e !== void 0
@@ -429,15 +439,15 @@ function Ke(e, n, t) {
       ? `Field(${i}, default=None)`
       : `Field(${i}, default=...)`;
 }
-function B(e, n, t, i, r) {
+function _(e, n, t, i, r) {
   let o = t.pathNameMap.get(e);
   if (o) return o;
-  let s = Je(i, n, r),
+  let s = He(i, n, r),
     a = t.nameCounts.get(s) ?? 0,
     u = a === 0 ? s : `${s}${a + 1}`;
   return (t.nameCounts.set(s, a + 1), t.pathNameMap.set(e, u), u);
 }
-function Je(e, n, t) {
+function He(e, n, t) {
   let i = e
     .filter(Boolean)
     .map((r) => (r === '[item]' ? 'Item' : (/^option\d+$/i.test(r), r)))
@@ -453,26 +463,29 @@ function F(e) {
       .join('') || 'Model'
   );
 }
-function Ye(e) {
+function Xe(e) {
   return e
-    .replace(/[^a-zA-Z0-9]+/g, '_')
-    .replace(/([a-z0-9])([A-Z])/g, '$1_$2')
+    .replaceAll(/[^a-zA-Z0-9]+/g, '_')
+    .replaceAll(/([a-z0-9])([A-Z])/g, '$1_$2')
     .toUpperCase();
 }
-function _(e, n, t) {
-  let { inner: i } = be(e);
+function re(e, n) {
+  return e < n ? -1 : e > n ? 1 : 0;
+}
+function Z(e, n, t) {
+  let { inner: i } = Ne(e);
   if (i.type === 'object') {
     t(i, n);
-    for (let [r, o] of Object.entries(i.fields)) _(o, [...n, r], t);
+    for (let [r, o] of Object.entries(i.fields)) Z(o, [...n, r], t);
     return;
   }
   if (i.type === 'array') {
-    _(i.element, [...n, '[item]'], t);
+    Z(i.element, [...n, '[item]'], t);
     return;
   }
-  i.type === 'union' && i.options.forEach((r, o) => _(r, [...n, `option${o}`], t));
+  i.type === 'union' && i.options.forEach((r, o) => Z(r, [...n, `option${o}`], t));
 }
-function Te(e, n) {
+function Fe(e, n) {
   let t = {
     renderedPaths: new Set(),
     warnings: n.warnings ?? [],
@@ -480,19 +493,19 @@ function Te(e, n) {
     pathNameMap: new Map(),
     nameCounts: new Map(),
   };
-  if (e.type === 'enum') return ie(e, n);
+  if (e.type === 'enum') return oe(e, n);
   if (e.type !== 'object')
     throw new Error('Root schema must be a Zod object or enum to generate TypeScript definitions.');
-  return re(e, n.name, t, []);
+  return se(e, n.name, t, []);
 }
-function ie(e, n) {
+function oe(e, n) {
   if (e.type !== 'enum')
     throw new Error('Root schema must be an enum to generate TypeScript enum type.');
-  let t = J(n.name),
-    r = e.values.map((o) => D(o)).join(' | ');
+  let t = Y(n.name),
+    r = e.values.map((o) => L(o)).join(' | ');
   return `export type ${t} = ${r};`;
 }
-function Ee(e, n) {
+function Pe(e, n) {
   let t = {
       renderedPaths: new Set(),
       warnings: n.warnings ?? [],
@@ -500,35 +513,35 @@ function Ee(e, n) {
       pathNameMap: new Map(),
       nameCounts: new Map(),
     },
-    i = J(n.name),
-    r = K(e, t, [], i, !1);
+    i = Y(n.name),
+    r = J(e, t, [], i, !1);
   return `export type ${i} = ${r.typeAnnotation};`;
 }
-function re(e, n, t, i) {
+function se(e, n, t, i) {
   if (e.type !== 'object') throw new Error(`Cannot render non-object node as interface "${n}"`);
-  let r = G(i.join('.') || n, n, t, i),
+  let r = q(i.join('.') || n, n, t, i),
     o = [];
   for (let [d, f] of Object.entries(e.fields)) {
-    let { inner: h } = se(f);
+    let { inner: h } = ae(f);
     if (h.type === 'object') {
       let p = [...i, d],
         g = p.join('.');
       if (!t.renderedPaths.has(g)) {
         t.renderedPaths.add(g);
-        let v = G(p.join('.'), d, t, p, r);
-        o.push(re(h, v, t, p));
+        let v = q(p.join('.'), d, t, p, r);
+        o.push(se(h, v, t, p));
       }
     } else
-      q(f, [...i, d], (p, g) => {
+      K(f, [...i, d], (p, g) => {
         let v = g.join('.');
         if (t.renderedPaths.has(v)) return;
         t.renderedPaths.add(v);
-        let k = G(v, g[g.length - 1] ?? 'Model', t, g, r);
-        o.push(re(p, k, t, g));
+        let k = q(v, g.at(-1) ?? 'Model', t, g, r);
+        o.push(se(p, k, t, g));
       });
   }
   let s = [];
-  for (let [d, f] of Object.entries(e.fields)) s.push(He(d, f, t, [...i, d], r));
+  for (let [d, f] of Object.entries(e.fields)) s.push(Qe(d, f, t, [...i, d], r));
   let a = (d) => (d.length === 0 ? '' : `  ${d}`),
     u = [];
   for (let d of s.length ? s : []) u.push(a(d));
@@ -544,14 +557,14 @@ ${u.join(`
 
 `);
 }
-function He(e, n, t, i, r) {
-  let { typeAnnotation: o, isOptional: s } = K(n, t, i, r, !0),
+function Qe(e, n, t, i, r) {
+  let { typeAnnotation: o, isOptional: s } = J(n, t, i, r, !0),
     a = s ? '?' : '';
-  return `${Qe(e)}${a}: ${o};`;
+  return `${nn(e)}${a}: ${o};`;
 }
-function K(e, n, t, i, r) {
-  let { inner: o, optional: s, nullable: a, nullish: u } = se(e),
-    l = Xe(o, n, t, i),
+function J(e, n, t, i, r) {
+  let { inner: o, optional: s, nullable: a, nullish: u } = ae(e),
+    l = en(o, n, t, i),
     c = l,
     m = !1;
   return (
@@ -573,7 +586,7 @@ function K(e, n, t, i, r) {
     { typeAnnotation: c, isOptional: m }
   );
 }
-function Xe(e, n, t, i) {
+function en(e, n, t, i) {
   switch (e.type) {
     case 'string':
       return 'string';
@@ -599,21 +612,21 @@ function Xe(e, n, t, i) {
     case 'duration':
       return 'string';
     case 'enum':
-      return e.values.map((o) => D(o)).join(' | ');
+      return e.values.map((o) => L(o)).join(' | ');
     case 'literal':
-      return D(e.value);
+      return L(e.value);
     case 'array': {
-      let r = K(e.element, n, [...t, '[item]'], i, !1);
+      let r = J(e.element, n, [...t, '[item]'], i, !1);
       return `${r.typeAnnotation.includes(' | ') ? `(${r.typeAnnotation})` : r.typeAnnotation}[]`;
     }
     case 'union':
       return e.options
-        .map((o, s) => K(o, n, [...t, `option${s}`], i, !1))
+        .map((o, s) => J(o, n, [...t, `option${s}`], i, !1))
         .map((o) => o.typeAnnotation)
         .join(' | ');
     case 'object': {
       let r = t.join('.');
-      return n.exportNameOverrides.get(r) ?? G(t.join('.'), t[t.length - 1] ?? i, n, t, i);
+      return n.exportNameOverrides.get(r) ?? q(t.join('.'), t.at(-1) ?? i, n, t, i);
     }
     case 'any':
       return 'any';
@@ -625,7 +638,7 @@ function Xe(e, n, t, i) {
       return 'any';
   }
 }
-function se(e) {
+function ae(e) {
   let n = e,
     t = !1,
     i = !1,
@@ -651,7 +664,7 @@ function se(e) {
   }
   return { inner: n, optional: t, nullable: i, nullish: r };
 }
-function D(e) {
+function L(e) {
   switch (typeof e) {
     case 'string':
       return JSON.stringify(e);
@@ -665,17 +678,17 @@ function D(e) {
       return e === null
         ? 'null'
         : Array.isArray(e)
-          ? `[${e.map((n) => D(n)).join(', ')}]`
+          ? `[${e.map((n) => L(n)).join(', ')}]`
           : '{ ' +
             Object.entries(e)
-              .map(([n, t]) => `${JSON.stringify(n)}: ${D(t)}`)
+              .map(([n, t]) => `${JSON.stringify(n)}: ${L(t)}`)
               .join(', ') +
             ' }';
     default:
       return 'any';
   }
 }
-function J(e) {
+function Y(e) {
   return (
     e
       .split(/[^a-zA-Z0-9]/g)
@@ -684,49 +697,49 @@ function J(e) {
       .join('') || 'Model'
   );
 }
-function Qe(e) {
+function nn(e) {
   return /^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(e) ? e : JSON.stringify(e);
 }
-function G(e, n, t, i, r) {
+function q(e, n, t, i, r) {
   let o = t.exportNameOverrides.get(e);
   if (o) return (t.pathNameMap.set(e, o), o);
   let s = t.pathNameMap.get(e);
   if (s) return s;
-  let a = en(i, n, r),
+  let a = tn(i, n, r),
     u = t.nameCounts.get(a) ?? 0,
     l = u === 0 ? a : `${a}${u + 1}`;
   return (t.nameCounts.set(a, u + 1), t.pathNameMap.set(e, l), l);
 }
-function en(e, n, t) {
+function tn(e, n, t) {
   let i = e
     .filter(Boolean)
     .map((r) => (r === '[item]' ? 'Item' : (/^option\d+$/i.test(r), r)))
     .filter((r) => r !== '');
-  return i.length === 0 ? J(n || t || 'Model') : J(i.join(' '));
+  return i.length === 0 ? Y(n || t || 'Model') : Y(i.join(' '));
 }
-function q(e, n, t) {
-  let { inner: i } = se(e);
+function K(e, n, t) {
+  let { inner: i } = ae(e);
   if (i.type === 'object') {
     t(i, n);
-    for (let [r, o] of Object.entries(i.fields)) q(o, [...n, r], t);
+    for (let [r, o] of Object.entries(i.fields)) K(o, [...n, r], t);
     return;
   }
   if (i.type === 'array') {
-    q(i.element, [...n, '[item]'], t);
+    K(i.element, [...n, '[item]'], t);
     return;
   }
-  i.type === 'union' && i.options.forEach((r, o) => q(r, [...n, `option${o}`], t));
+  i.type === 'union' && i.options.forEach((r, o) => K(r, [...n, `option${o}`], t));
 }
-function oe(e, n = []) {
+function ue(e, n = []) {
   let t = [];
   return { node: S(e, n, t), warnings: t };
 }
 function S(e, n, t) {
-  if (nn(e)) return { type: 'literal', value: e };
-  let i = rn(e);
+  if (rn(e)) return { type: 'literal', value: e };
+  let i = on(e);
   if (!i || typeof i != 'object') throw new Error('Invalid Zod schema definition');
   let r = i,
-    o = sn(r);
+    o = an(r);
   switch (o) {
     case 'optional':
     case 'ZodOptional': {
@@ -783,7 +796,7 @@ function S(e, n, t) {
   switch (o) {
     case 'string':
     case 'ZodString': {
-      let { constraints: s, inferredType: a } = on(r);
+      let { constraints: s, inferredType: a } = un(r);
       return a === 'uuid'
         ? { type: 'uuid' }
         : a === 'isodate'
@@ -804,7 +817,7 @@ function S(e, n, t) {
     }
     case 'number':
     case 'ZodNumber': {
-      let { constraints: s, isInt: a } = an(r);
+      let { constraints: s, isInt: a } = ln(r);
       return a
         ? s
           ? { type: 'int', constraints: s }
@@ -881,16 +894,16 @@ function S(e, n, t) {
       );
   }
 }
-function nn(e) {
+function rn(e) {
   return e === null || typeof e == 'string' || typeof e == 'number' || typeof e == 'boolean';
 }
-function tn(e) {
+function sn(e) {
   return typeof e == 'object' && e !== null && '_zod' in e;
 }
-function rn(e) {
-  return tn(e) ? e._zod.def : e._def;
+function on(e) {
+  return sn(e) ? e._zod.def : e._def;
 }
-function sn(e) {
+function an(e) {
   let n = typeof e.type == 'string' ? e.type : void 0;
   if (n) return n;
   let t =
@@ -901,12 +914,12 @@ function sn(e) {
         : void 0;
   if (t) return t.startsWith('Symbol(') && t.endsWith(')') ? t.slice(7, -1) : t;
 }
-function on(e) {
+function un(e) {
   let n = e.checks || [],
     t = {},
     i;
   for (let o of n) {
-    let s = $e(o);
+    let s = je(o);
     if (s)
       switch (s.kind) {
         case 'min':
@@ -945,7 +958,7 @@ function on(e) {
       }
   }
   if (n.length === 0 && e.check) {
-    let o = $e(e);
+    let o = je(e);
     if (o)
       switch (o.kind) {
         case 'uuid':
@@ -990,12 +1003,12 @@ function on(e) {
     r
   );
 }
-function an(e) {
+function ln(e) {
   let n = e.checks || [],
     t = {},
     i = !1;
   for (let o of n) {
-    let s = Ce(o);
+    let s = Me(o);
     if (s)
       switch (s.kind) {
         case 'min':
@@ -1012,7 +1025,7 @@ function an(e) {
       }
   }
   if (n.length === 0 && e.check) {
-    let o = Ce(e);
+    let o = Me(e);
     if (o)
       switch (o.kind) {
         case 'int':
@@ -1031,7 +1044,7 @@ function an(e) {
   let r = { isInt: i };
   return (Object.keys(t).length > 0 && (r.constraints = t), r);
 }
-function $e(e) {
+function je(e) {
   if (!e || typeof e != 'object') return null;
   if ('kind' in e) {
     let r = e;
@@ -1104,7 +1117,7 @@ function $e(e) {
       return null;
   }
 }
-function Ce(e) {
+function Me(e) {
   if (!e || typeof e != 'object') return null;
   if ('kind' in e) {
     let o = e;
@@ -1157,47 +1170,107 @@ function Ce(e) {
     }
   return e.isInt === !0 ? { kind: 'int' } : null;
 }
-import { pathToFileURL as un } from 'node:url';
+import le from 'node:fs/promises';
+import cn from 'node:path';
+var Oe = '# Generated by SchemaBridge. Do not edit.',
+  Ae = '// Generated by SchemaBridge. Do not edit.';
+async function Ie(e, n, t) {
+  let i = ce(n, t),
+    r = await H(e);
+  return r !== void 0 && B(r) === i
+    ? 'unchanged'
+    : (await le.mkdir(cn.dirname(e), { recursive: !0 }),
+      await le.writeFile(e, i, 'utf8'),
+      'written');
+}
+function ce(e, n) {
+  return dn(e, n);
+}
+async function H(e) {
+  try {
+    return await le.readFile(e, 'utf8');
+  } catch (n) {
+    if (pn(n) && n.code === 'ENOENT') return;
+    throw n;
+  }
+}
+function Ze(e, n) {
+  let t = B(n).split(`
+`)[0];
+  return e.endsWith('.py') ? t === Oe : e.endsWith('.d.ts') ? t === Ae : !1;
+}
+function dn(e, n) {
+  let t = n === 'pydantic' ? Oe : Ae,
+    i = B(e);
+  return i.startsWith(`${t}
+`)
+    ? i
+    : i.trim().length === 0
+      ? `${t}
+`
+      : `${t}
+
+${i}`;
+}
+function B(e) {
+  return `${e
+    .replace(
+      /\r\n/g,
+      `
+`,
+    )
+    .replace(
+      /\r/g,
+      `
+`,
+    )
+    .replace(/\n*$/g, '')}
+`;
+}
+function pn(e) {
+  return e instanceof Error && 'code' in e;
+}
+import { pathToFileURL as mn } from 'node:url';
 import T from 'node:path';
-import ae from 'node:fs/promises';
+import de from 'node:fs/promises';
 import $ from 'typescript';
-function Y(e) {
+function X(e) {
   return !e || typeof e != 'object' ? !1 : '_def' in e || '_zod' in e;
 }
-var U = null;
-async function H() {
-  if (U) {
-    await U;
+var D = null;
+async function Q() {
+  if (D) {
+    await D;
     return;
   }
-  ((U = import('tsx/esm').catch((e) => {
-    U = null;
+  ((D = import('tsx/esm').catch((e) => {
+    D = null;
     let n = e instanceof Error ? e.message : String(e);
     throw new Error(
       `Failed to register TypeScript loader (tsx). Install "tsx" as a dependency or precompile schemas. ${n}`,
     );
   })),
-    await U);
+    await D);
 }
 var N = class extends Error {
   constructor(n) {
     (super(n), (this.name = 'SchemaLoadError'));
   }
 };
-async function ue(e) {
+async function pe(e) {
   if (!e.trustedInput)
     throw new N(
       'Refusing to dynamically import untrusted schema modules. Set trustedInput: true only for trusted local files.',
     );
   let n = T.resolve(e.file);
-  e.registerTsLoader && (await H());
-  let { warnings: t, dependencies: i } = await ln(n, {
+  e.registerTsLoader && (await Q());
+  let { warnings: t, dependencies: i } = await fn(n, {
       ...(e.tsconfigPath !== void 0 && { tsconfigPath: e.tsconfigPath }),
       ...(e.allowUnresolved !== void 0 && { allowUnresolved: e.allowUnresolved }),
     }),
     r;
   try {
-    r = await import(un(n).href);
+    r = await import(mn(n).href);
   } catch (s) {
     let a = s instanceof Error ? s.message : String(s);
     throw new N(`Failed to import schema module "${n}": ${a}`);
@@ -1209,21 +1282,21 @@ async function ue(e) {
     );
   }
   let o = r[e.exportName];
-  if (!Y(o)) throw new N(`Export "${e.exportName}" in "${n}" is not a Zod schema.`);
+  if (!X(o)) throw new N(`Export "${e.exportName}" in "${n}" is not a Zod schema.`);
   return { schema: o, warnings: t, dependencies: i };
 }
-async function ln(e, n) {
+async function fn(e, n) {
   let t = new Set(),
     i = [],
     r = [T.resolve(e)],
-    o = n.tsconfigPath ? await cn(n.tsconfigPath) : void 0;
+    o = n.tsconfigPath ? await gn(n.tsconfigPath) : void 0;
   for (; r.length; ) {
     let s = r.pop();
     if (!s || t.has(s)) continue;
     t.add(s);
     let a;
     try {
-      a = await ae.readFile(s, 'utf8');
+      a = await de.readFile(s, 'utf8');
     } catch {
       continue;
     }
@@ -1234,7 +1307,7 @@ async function ln(e, n) {
     for (let m of c) {
       if (!m.moduleSpecifier || !$.isStringLiteral(m.moduleSpecifier)) continue;
       let d = m.moduleSpecifier.text,
-        f = await dn(d, u, o);
+        f = await yn(d, u, o);
       if (f !== null) {
         if (!f) {
           if (n.allowUnresolved) {
@@ -1249,27 +1322,27 @@ async function ln(e, n) {
   }
   return { warnings: i, dependencies: Array.from(t) };
 }
-async function cn(e) {
+async function gn(e) {
   try {
-    let n = await ae.readFile(e, 'utf8'),
+    let n = await de.readFile(e, 'utf8'),
       t = $.parseConfigFileTextToJson(e, n);
     return t.error ? void 0 : $.parseJsonConfigFileContent(t.config, $.sys, T.dirname(e));
   } catch {
     return;
   }
 }
-async function dn(e, n, t) {
-  if (e.startsWith('.') || e.startsWith('/')) return await Pe(T.resolve(n, e));
+async function yn(e, n, t) {
+  if (e.startsWith('.') || e.startsWith('/')) return await Re(T.resolve(n, e));
   if (t?.options.paths && t.options.baseUrl) {
-    let i = pn(e, t.options.baseUrl, t.options.paths);
+    let i = hn(e, t.options.baseUrl, t.options.paths);
     if (i) {
-      let r = await Pe(i);
+      let r = await Re(i);
       if (r) return r;
     }
   }
   return null;
 }
-function pn(e, n, t) {
+function hn(e, n, t) {
   for (let [i, r] of Object.entries(t)) {
     let o = i.indexOf('*');
     if (o === -1) {
@@ -1292,7 +1365,7 @@ function pn(e, n, t) {
   }
   return null;
 }
-async function Pe(e) {
+async function Re(e) {
   let n = ['', '.ts', '.tsx', '.mts', '.cts', '.js', '.mjs', '.cjs'],
     t = new Set();
   for (let r of n) t.add(e.endsWith(r) ? e : e + r);
@@ -1303,16 +1376,16 @@ async function Pe(e) {
   }
   for (let r of t)
     try {
-      if ((await ae.stat(r)).isFile()) return r;
+      if ((await de.stat(r)).isFile()) return r;
     } catch {
       continue;
     }
   return null;
 }
-import mn from 'node:fs/promises';
-import X from 'node:path';
-import { pathToFileURL as fn } from 'node:url';
-async function le(e) {
+import vn from 'node:fs/promises';
+import ee from 'node:path';
+import { pathToFileURL as wn } from 'node:url';
+async function me(e) {
   let {
     sourceDir: n,
     extensions: t = ['.ts', '.tsx', '.js', '.mjs'],
@@ -1327,13 +1400,13 @@ async function le(e) {
     throw new Error(
       'Refusing to dynamically import untrusted schema files. Set trustedInput: true only for trusted local files.',
     );
-  let l = X.resolve(n),
+  let l = ee.resolve(n),
     c = [],
     m = [],
     d = [];
-  r && (await H());
-  let f = u !== void 0 ? hn(u) : void 0,
-    h = await gn(l, t, i),
+  r && (await Q());
+  let f = u !== void 0 ? xn(u) : void 0,
+    h = await bn(l, t, i),
     p = new Set();
   for (let g of h)
     if (!p.has(g)) {
@@ -1341,8 +1414,8 @@ async function le(e) {
       try {
         let v = { registerTsLoader: !1, allowUnresolved: s };
         o !== void 0 && (v.tsconfigPath = o);
-        let k = await yn(g, v),
-          x = f !== void 0 ? k.filter((M) => f.test(M.exportName)) : k;
+        let k = await kn(g, v),
+          x = f !== void 0 ? k.filter((j) => f.test(j.exportName)) : k;
         if (x.length === 0) {
           d.push(g);
           continue;
@@ -1359,17 +1432,17 @@ async function le(e) {
     }
   return { schemas: c, warnings: m, skippedFiles: d };
 }
-async function gn(e, n, t) {
+async function bn(e, n, t) {
   let i = [],
     r = new Set(n);
   async function o(s) {
-    let a = (await mn.readdir(s, { withFileTypes: !0 })).sort((u, l) => Fe(u.name, l.name));
+    let a = (await vn.readdir(s, { withFileTypes: !0 })).sort((u, l) => _e(u.name, l.name));
     for (let u of a) {
-      let l = X.join(s, u.name);
+      let l = ee.join(s, u.name);
       if (!t.some((c) => u.name.includes(c))) {
         if (u.isDirectory()) await o(l);
         else if (u.isFile()) {
-          let c = X.extname(u.name);
+          let c = ee.extname(u.name);
           r.has(c) && i.push(l);
         }
       }
@@ -1377,26 +1450,24 @@ async function gn(e, n, t) {
   }
   return (await o(e), i);
 }
-async function yn(e, n) {
-  let t = X.resolve(e),
-    i = await import(fn(t).href),
+async function kn(e, n) {
+  let t = ee.resolve(e),
+    i = await import(wn(t).href),
     r = [],
-    o = Object.entries(i).sort(([s], [a]) => Fe(s, a));
-  for (let [s, a] of o) s !== 'default' && Y(a) && r.push({ file: t, exportName: s, schema: a });
+    o = Object.entries(i).sort(([s], [a]) => _e(s, a));
+  for (let [s, a] of o) s !== 'default' && X(a) && r.push({ file: t, exportName: s, schema: a });
   return r;
 }
-function hn(e) {
+function xn(e) {
   let n = e.replace(/[-/\\^$+?.()|[\]{}]/g, '\\$&').replace(/\*/g, '.*');
   return new RegExp(`^${n}$`);
 }
-function Fe(e, n) {
+function _e(e, n) {
   return e < n ? -1 : e > n ? 1 : 0;
 }
-import j from 'node:fs/promises';
+import U from 'node:fs/promises';
 import y from 'node:path';
-var Me = '# Generated by SchemaBridge. Do not edit.',
-  Oe = '// Generated by SchemaBridge. Do not edit.';
-async function de(e) {
+async function ge(e) {
   let {
       outDir: n,
       target: t,
@@ -1408,8 +1479,8 @@ async function de(e) {
       ...u
     } = e,
     l = y.resolve(n);
-  r || (await j.mkdir(l, { recursive: !0 }));
-  let c = await le(u),
+  r || (await U.mkdir(l, { recursive: !0 }));
+  let c = await me(u),
     m = [...c.warnings],
     d = [...c.skippedFiles],
     f = [],
@@ -1422,13 +1493,13 @@ async function de(e) {
     let b = w.exportName;
     if (!v.has(b)) (v.set(b, w), k.set(b, w.file));
     else {
-      let I = k.get(b);
-      if (!I) {
+      let O = k.get(b);
+      if (!O) {
         (v.set(b, w), k.set(b, w.file));
         continue;
       }
       if (y.basename(w.file) === 'index.ts' || y.basename(w.file) === 'index.js') continue;
-      (y.basename(I) === 'index.ts' || y.basename(I) === 'index.js') &&
+      (y.basename(O) === 'index.ts' || y.basename(O) === 'index.js') &&
         (v.set(b, w), k.set(b, w.file));
     }
   }
@@ -1437,44 +1508,43 @@ async function de(e) {
     let b = x.get(w.file) || [];
     (b.push(w), x.set(w.file, b));
   }
-  let M = new Map();
+  let j = new Map();
   for (let [w, b] of x.entries()) {
     if (b.length === 0) continue;
-    let I = y.relative(u.sourceDir, w),
+    let O = y.relative(u.sourceDir, w),
       W;
     if (o) {
-      let Z = y.dirname(I),
-        ee = y.basename(w, y.extname(w));
-      W = y.join(l, Z, ee);
+      let A = y.dirname(O),
+        ne = y.basename(w, y.extname(w));
+      W = y.join(l, A, ne);
     } else W = l;
-    for (let Z of b) {
-      let ee = t === 'all' ? ['pydantic', 'typescript'] : [t];
-      for (let R of ee)
+    for (let A of b) {
+      let ne = t === 'all' ? ['pydantic', 'typescript'] : [t];
+      for (let G of ne)
         try {
           let E = {
             preserveStructure: o,
             outputBasePath: W,
             sourceFile: w,
             outDir: l,
-            usedNames: M,
+            usedNames: j,
           };
           (e.enumStyle !== void 0 && (E.enumStyle = e.enumStyle),
             e.enumBaseType !== void 0 && (E.enumBaseType = e.enumBaseType));
-          let A = vn(Z, R, E),
-            ne = A.path;
-          (p.push({ path: ne, content: je(A.content, R), target: R }),
-            g && R === 'pydantic' && Sn(g, ne, A.symbolName),
-            h.push({ path: ne, sourceFile: w, exportName: Z.exportName, target: R }));
+          let I = Sn(A, G, E),
+            te = I.path;
+          (p.push({ path: te, content: I.content, target: G }),
+            g && G === 'pydantic' && Cn(g, te, I.symbolName),
+            h.push({ path: te, sourceFile: w, exportName: A.exportName, target: G }));
         } catch (E) {
-          let A = E instanceof Error ? E.message : String(E);
-          f.push(`Failed to convert ${Z.exportName} from ${w}: ${A}`);
+          let I = E instanceof Error ? E.message : String(E);
+          f.push(`Failed to convert ${A.exportName} from ${w}: ${I}`);
         }
     }
   }
   if (g) {
-    let w = Nn(l, g);
-    for (let b of w)
-      p.push({ path: b.path, content: je(b.content, 'pydantic'), target: 'pydantic' });
+    let w = Fn(l, g);
+    for (let b of w) p.push({ path: b.path, content: b.content, target: 'pydantic' });
   }
   if (f.length > 0)
     return {
@@ -1487,9 +1557,9 @@ async function de(e) {
       deleted: 0,
       outOfDate: 0,
     };
-  let O = await wn(p, { outDir: l, target: t, clean: i, verify: r });
+  let M = await Nn(p, { outDir: l, target: t, clean: i, verify: r });
   for (let w of h) {
-    let b = O.actionByPath.get(y.resolve(w.path));
+    let b = M.actionByPath.get(y.resolve(w.path));
     b !== void 0 && (w.action = b);
   }
   return {
@@ -1497,13 +1567,13 @@ async function de(e) {
     warnings: m,
     skippedFiles: d,
     errors: f,
-    written: O.written,
-    unchanged: O.unchanged,
-    deleted: O.deleted,
-    outOfDate: O.outOfDate,
+    written: M.written,
+    unchanged: M.unchanged,
+    deleted: M.deleted,
+    outOfDate: M.outOfDate,
   };
 }
-function vn(e, n, t) {
+function Sn(e, n, t) {
   let { schema: i, exportName: r } = e,
     {
       preserveStructure: o,
@@ -1513,8 +1583,8 @@ function vn(e, n, t) {
       enumStyle: l,
       enumBaseType: c,
     } = t,
-    m = $n(r),
-    d = Cn(r),
+    m = Mn(r),
+    d = On(r),
     f = n === 'pydantic' ? '.py' : '.d.ts',
     h = o ? y.dirname(s) : a,
     p = `${d}${f}`,
@@ -1525,10 +1595,10 @@ function vn(e, n, t) {
   o ? (k = y.join(y.dirname(s), p)) : (k = y.join(a, p));
   let x = { name: m, sourceModule: e.file };
   (l !== void 0 && (x.enumStyle = l), c !== void 0 && (x.enumBaseType = c));
-  let M = n === 'pydantic' ? pe(i, x) : me(i, x);
-  return { path: k, content: M, symbolName: m };
+  let j = n === 'pydantic' ? ye(i, x) : he(i, x);
+  return { path: k, content: j, symbolName: m };
 }
-async function wn(e, n) {
+async function Nn(e, n) {
   let t = 0,
     i = 0,
     r = 0,
@@ -1537,9 +1607,9 @@ async function wn(e, n) {
     a = new Set(e.map((u) => y.resolve(u.path)));
   for (let u of e) {
     let l = y.resolve(u.path),
-      c = Q(u.content),
-      m = await Ie(l);
-    if (m !== void 0 && Q(m) === c) {
+      c = ce(u.content, u.target),
+      m = await H(l);
+    if (m !== void 0 && B(m) === c) {
       (i++, s.set(l, 'unchanged'));
       continue;
     }
@@ -1547,34 +1617,26 @@ async function wn(e, n) {
       (o++, s.set(l, 'outOfDate'));
       continue;
     }
-    (await j.mkdir(y.dirname(l), { recursive: !0 }),
-      await j.writeFile(l, c, 'utf8'),
+    (await U.mkdir(y.dirname(l), { recursive: !0 }),
+      await U.writeFile(l, c, 'utf8'),
       t++,
       s.set(l, 'written'));
   }
   if (n.clean) {
-    let u = await bn(n.outDir, a, n.target);
+    let u = await Tn(n.outDir, a, n.target);
     if (n.verify) o += u.length;
-    else for (let l of u) (await j.unlink(l), r++);
+    else for (let l of u) (await U.unlink(l), r++);
   }
   return { written: t, unchanged: i, deleted: r, outOfDate: o, actionByPath: s };
 }
-async function Ie(e) {
-  try {
-    return await j.readFile(e, 'utf8');
-  } catch (n) {
-    if (Ze(n) && n.code === 'ENOENT') return;
-    throw n;
-  }
-}
-async function bn(e, n, t) {
+async function Tn(e, n, t) {
   let i = [];
   async function r(o) {
     let s;
     try {
-      s = (await j.readdir(o, { withFileTypes: !0 })).sort((a, u) => ce(a.name, u.name));
+      s = (await U.readdir(o, { withFileTypes: !0 })).sort((a, u) => fe(a.name, u.name));
     } catch (a) {
-      if (Ze(a) && a.code === 'ENOENT') return;
+      if ($n(a) && a.code === 'ENOENT') return;
       throw a;
     }
     for (let a of s) {
@@ -1585,80 +1647,47 @@ async function bn(e, n, t) {
       }
       if (!a.isFile()) continue;
       let l = y.resolve(u);
-      if (n.has(l) || !kn(l, t)) continue;
-      let c = await Ie(l);
-      c !== void 0 && xn(l, c) && i.push(l);
+      if (n.has(l) || !En(l, t)) continue;
+      let c = await H(l);
+      c !== void 0 && Ze(l, c) && i.push(l);
     }
   }
   return (await r(e), i);
 }
-function kn(e, n) {
+function En(e, n) {
   let t = n === 'all' ? ['pydantic', 'typescript'] : [n];
   return (
     (t.includes('pydantic') && e.endsWith('.py')) ||
     (t.includes('typescript') && e.endsWith('.d.ts'))
   );
 }
-function xn(e, n) {
-  let t = Q(n).split(`
-`)[0];
-  return e.endsWith('.py') ? t === Me : e.endsWith('.d.ts') ? t === Oe : !1;
-}
-function je(e, n) {
-  let t = n === 'pydantic' ? Me : Oe,
-    i = Q(e);
-  return i.startsWith(`${t}
-`)
-    ? i
-    : i.trim().length === 0
-      ? `${t}
-`
-      : `${t}
-
-${i}`;
-}
-function Q(e) {
-  return `${e
-    .replace(
-      /\r\n/g,
-      `
-`,
-    )
-    .replace(
-      /\r/g,
-      `
-`,
-    )
-    .replace(/\n*$/g, '')}
-`;
-}
-function ce(e, n) {
+function fe(e, n) {
   return e < n ? -1 : e > n ? 1 : 0;
 }
-function Ze(e) {
+function $n(e) {
   return e instanceof Error && 'code' in e;
 }
-function Sn(e, n, t) {
+function Cn(e, n, t) {
   let i = y.dirname(n),
     r = y.basename(n, y.extname(n)),
     o = e.get(i) ?? [];
   (o.push({ moduleName: r, symbolNames: [t] }), e.set(i, o));
 }
-function Nn(e, n) {
-  let t = Tn(e, n);
+function Fn(e, n) {
+  let t = Pn(e, n);
   t.has(e) || t.add(e);
-  let r = En(e, t, n).get(e);
+  let r = jn(e, t, n).get(e);
   if (!r) return [];
   let o = new Map(),
     s = (a) => {
       let u = [],
         l = [],
-        c = [...a.modules].sort((p, g) => ce(p.moduleName, g.moduleName));
+        c = [...a.modules].sort((p, g) => fe(p.moduleName, g.moduleName));
       for (let p of c) {
         let g = p.symbolNames.join(', ');
         (u.push(`from .${p.moduleName} import ${g}`), l.push(...p.symbolNames));
       }
-      let m = [...a.children].sort((p, g) => ce(y.basename(p.path), y.basename(g.path)));
+      let m = [...a.children].sort((p, g) => fe(y.basename(p.path), y.basename(g.path)));
       for (let p of m) {
         let g = s(p);
         if (g.length === 0) continue;
@@ -1685,13 +1714,13 @@ function Nn(e, n) {
     };
   return (s(r), [...o.entries()].map(([a, u]) => ({ path: y.join(a, '__init__.py'), content: u })));
 }
-function Tn(e, n) {
+function Pn(e, n) {
   let t = new Set();
   for (let i of n.keys()) {
     t.add(i);
     let r = i;
     for (;;) {
-      let o = Re(r, e);
+      let o = Le(r, e);
       if (!o) break;
       if (t.has(o)) {
         r = o;
@@ -1702,7 +1731,7 @@ function Tn(e, n) {
   }
   return t;
 }
-function En(e, n, t) {
+function jn(e, n, t) {
   let i = new Map(),
     r = (o) => {
       let s = i.get(o);
@@ -1713,7 +1742,7 @@ function En(e, n, t) {
     };
   for (let o of n) r(o);
   for (let o of n) {
-    let s = Re(o, e);
+    let s = Le(o, e);
     if (!s) continue;
     let a = r(s),
       u = r(o);
@@ -1721,12 +1750,12 @@ function En(e, n, t) {
   }
   return i;
 }
-function Re(e, n) {
+function Le(e, n) {
   if (e === n) return null;
   let t = y.dirname(e);
   return !t || t === e || !t.startsWith(n) ? null : t;
 }
-function $n(e) {
+function Mn(e) {
   return (
     e
       .split(/[^a-zA-Z0-9]/g)
@@ -1735,40 +1764,40 @@ function $n(e) {
       .join('') || 'Model'
   );
 }
-function Cn(e) {
+function On(e) {
   return e
     .replace(/([a-z])([A-Z])/g, '$1_$2')
     .replace(/[^a-zA-Z0-9]+/g, '_')
     .toLowerCase()
     .replace(/^_+|_+$/g, '');
 }
-function pe(e, n) {
-  let { node: t, warnings: i } = oe(e),
+function ye(e, n) {
+  let { node: t, warnings: i } = ue(e),
     r = { name: n.name, warnings: i };
   return (
     n.sourceModule !== void 0 && (r.sourceModule = n.sourceModule),
     n.enumStyle !== void 0 && (r.enumStyle = n.enumStyle),
     n.enumBaseType !== void 0 && (r.enumBaseType = n.enumBaseType),
-    t.type === 'enum' ? ve(t, r) : t.type === 'object' ? he(t, r) : we(t, r)
+    t.type === 'enum' ? xe(t, r) : t.type === 'object' ? ke(t, r) : Se(t, r)
   );
 }
-function me(e, n) {
-  let { node: t, warnings: i } = oe(e),
+function he(e, n) {
+  let { node: t, warnings: i } = ue(e),
     r = { name: n.name, warnings: i };
   return (
     n.sourceModule !== void 0 && (r.sourceModule = n.sourceModule),
     n.exportNameOverrides !== void 0 && (r.exportNameOverrides = n.exportNameOverrides),
-    t.type === 'enum' ? ie(t, r) : t.type === 'object' ? Te(t, r) : Ee(t, r)
+    t.type === 'enum' ? oe(t, r) : t.type === 'object' ? Fe(t, r) : Pe(t, r)
   );
 }
-function _e(e) {
+function Be(e) {
   let { schema: n, target: t, out: i, ...r } = e,
     o = [],
     s = r.name,
-    a = i ? C.resolve(i) : void 0,
+    a = i ? P.resolve(i) : void 0,
     u = (c) => (c === 'pydantic' ? '.py' : '.d.ts');
   if (t === 'all') {
-    if (a && C.extname(a))
+    if (a && P.extname(a))
       return Promise.reject(
         new Error(
           'When target is "all", --out must be a directory or omitted. Received a file path with extension.',
@@ -1776,26 +1805,23 @@ function _e(e) {
       );
     let c = a ?? process.cwd();
     o.push(
-      { target: 'pydantic', path: C.join(c, `${s}${u('pydantic')}`) },
-      { target: 'typescript', path: C.join(c, `${s}${u('typescript')}`) },
+      { target: 'pydantic', path: P.join(c, `${s}${u('pydantic')}`) },
+      { target: 'typescript', path: P.join(c, `${s}${u('typescript')}`) },
     );
   } else
     a
-      ? C.extname(a)
+      ? P.extname(a)
         ? o.push({ target: t, path: a })
         : o.push({ target: t, path: `${a}${u(t)}` })
-      : o.push({ target: t, path: C.join(process.cwd(), `${s}${u(t)}`) });
+      : o.push({ target: t, path: P.join(process.cwd(), `${s}${u(t)}`) });
   let l = o.map(async (c) => {
-    let m = c.target === 'pydantic' ? pe(n, r) : me(n, r);
-    return (
-      await Ae.mkdir(C.dirname(c.path), { recursive: !0 }),
-      await Ae.writeFile(c.path, m, 'utf8'),
-      { path: c.path, target: c.target }
-    );
+    let m = c.target === 'pydantic' ? ye(n, r) : he(n, r),
+      d = await Ie(c.path, m, c.target);
+    return { path: c.path, target: c.target, action: d };
   });
   return Promise.all(l);
 }
-var Le = `
+var De = `
 Usage:
   schemabridge convert zod <input-file> --export <schema-name> [--to pydantic|typescript|all] [--out <path>] [--allow-unresolved] [--enum-style enum|literal] [--enum-base-type str|int]
   schemabridge convert folder <source-dir> --out <output-dir> [--to pydantic|typescript|all] [--flat] [--init] [--clean] [--verify] [--export-pattern <pattern>] [--allow-unresolved] [--enum-style enum|literal] [--enum-base-type str|int]
@@ -1829,11 +1855,11 @@ Examples:
   # Only convert exports whose names match a pattern (e.g. *Schema)
   schemabridge convert folder ./src/schemas --out ./generated --to pydantic --export-pattern '*Schema'
 `.trim();
-async function Fn(e = fe.argv.slice(2)) {
+async function In(e = ve.argv.slice(2)) {
   try {
-    let n = jn(e);
+    let n = Zn(e);
     if (n.mode === 'folder') {
-      let s = await de({
+      let s = await ge({
         sourceDir: n.sourceDir,
         outDir: n.out,
         target: n.target,
@@ -1866,7 +1892,7 @@ Sync summary: written ${s.written}, unchanged ${s.unchanged}, deleted ${s.delete
             : 0
       );
     }
-    let { schema: t, warnings: i } = await ue({
+    let { schema: t, warnings: i } = await pe({
       file: n.inputFile,
       exportName: n.exportName,
       registerTsLoader: !0,
@@ -1885,24 +1911,27 @@ Sync summary: written ${s.written}, unchanged ${s.unchanged}, deleted ${s.delete
     (n.out !== void 0 && (r.out = n.out),
       n.enumStyle !== void 0 && (r.enumStyle = n.enumStyle),
       n.enumBaseType !== void 0 && (r.enumBaseType = n.enumBaseType));
-    let o = await _e(r);
-    for (let s of o) console.log(`Wrote ${s.target}: ${s.path}`);
+    let o = await Be(r);
+    for (let s of o) {
+      let a = s.action === 'unchanged' ? 'Unchanged' : 'Wrote';
+      console.log(`${a} ${s.target}: ${s.path}`);
+    }
     return 0;
   } catch (n) {
     let t = n instanceof N || n instanceof Error ? n.message : String(n);
-    return (console.error(`Error: ${t}`), console.error(Le), 1);
+    return (console.error(`Error: ${t}`), console.error(De), 1);
   }
 }
-function jn(e) {
-  if (e.length === 0 || e.includes('--help') || e.includes('-h')) throw new Error(Le);
+function Zn(e) {
+  if (e.length === 0 || e.includes('--help') || e.includes('-h')) throw new Error(De);
   let [n, t, ...i] = e;
   if (n !== 'convert') throw new Error('Expected command: convert zod|folder ...');
-  if (t === 'folder') return On(i);
+  if (t === 'folder') return _n(i);
   if (t !== 'zod')
     throw new Error('Expected command: convert zod <input-file> or convert folder <source-dir>');
-  return Mn(i);
+  return Rn(i);
 }
-function Mn(e) {
+function Rn(e) {
   if (e.length === 0) throw new Error('Missing <input-file>');
   let n = e[0];
   if (!n) throw new Error('Missing <input-file>');
@@ -1986,7 +2015,7 @@ function Mn(e) {
   };
   return (r !== void 0 && (l.out = r), l);
 }
-function On(e) {
+function _n(e) {
   if (e.length === 0) throw new Error('Missing <source-dir>');
   let n = e[0];
   if (!n) throw new Error('Missing <source-dir>');
@@ -2091,8 +2120,8 @@ function On(e) {
     ...(d !== void 0 && { enumBaseType: d }),
   };
 }
-z.resolve(Pn(import.meta.url)) === z.resolve(fe.argv[1] ?? '') &&
-  Fn().then((e) => {
-    e !== 0 && fe.exit(e);
+z.resolve(An(import.meta.url)) === z.resolve(ve.argv[1] ?? '') &&
+  In().then((e) => {
+    e !== 0 && ve.exit(e);
   });
-export { Fn as runCLI };
+export { In as runCLI };

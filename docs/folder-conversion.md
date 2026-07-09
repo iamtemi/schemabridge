@@ -98,6 +98,7 @@ await convertFolder({
   target: 'pydantic',
   preserveStructure: true,
   generateInitFiles: true,
+  trustedInput: true,
 });
 ```
 
@@ -132,7 +133,7 @@ Use `--clean` when the output directory should match the current schema set:
 schemabridge convert folder ./src/schemas --out ./generated --to pydantic --clean
 ```
 
-`--clean` only removes stale files with the SchemaBridge generated-file marker. Hand-written files in the output directory are preserved.
+`--clean` only removes stale files with the SchemaBridge generated-file marker. Hand-written files and empty directories in the output directory are preserved.
 
 ::: warning Circular Dependencies
 Schemas that reference each other in a circle can cause problems. Keep your schema dependencies flowing one direction.
@@ -160,4 +161,4 @@ const userSchema = z.object({ ... });
 ## Zod v4 tips
 
 - Use direct helpers: `z.date()`, `z.coerce.date()`, `z.string().uuid()`, `z.string().email()`.
-- Avoid deprecated patterns like `z.string().datetime()` unless you truly want string output; otherwise consider `z.date()`/`z.coerce.date()`.\*\*\*
+- Use `z.coerce.date()` when you want Python `datetime` / TypeScript `Date` output. Use string datetime helpers only when you want string output.

@@ -118,7 +118,7 @@ function renderInterface(
 
         const nestedName = getNameForPath(
           pathKey,
-          objPath[objPath.length - 1] ?? 'Model',
+          objPath.at(-1) ?? 'Model',
           ctx,
           objPath,
           resolvedName,
@@ -292,7 +292,7 @@ function buildBaseType(
         overrideName ??
         getNameForPath(
           path.join('.'),
-          path[path.length - 1] ?? currentInterface,
+          path.at(-1) ?? currentInterface,
           ctx,
           path,
           currentInterface,

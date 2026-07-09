@@ -169,7 +169,8 @@ export async function runCLI(argv: string[] = process.argv.slice(2)): Promise<nu
     const results = await generateFilesFromZod(generateOptions);
 
     for (const result of results) {
-      console.log(`Wrote ${result.target}: ${result.path}`);
+      const label = result.action === 'unchanged' ? 'Unchanged' : 'Wrote';
+      console.log(`${label} ${result.target}: ${result.path}`);
     }
     return 0;
   } catch (err) {
