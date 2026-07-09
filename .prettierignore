@@ -6,6 +6,7 @@ node_modules/
 dist/
 bin/*.js
 bin/**/*.js
+packages/core/bin/**/*.js
 python/**/*.js
 *.tsbuildinfo
 

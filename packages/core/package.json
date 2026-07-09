@@ -1,6 +1,6 @@
 {
   "name": "@schemabridge/core",
-  "version": "0.3.2",
+  "version": "0.4.0",
   "description": "Cross-language schema converter: Zod to Pydantic and TypeScript",
   "type": "module",
   "main": "./dist/index.js",
@@ -66,7 +66,6 @@
     "globals": "^16.5.0",
     "husky": "^9.1.7",
     "prettier": "^3.8.3",
-    "typescript-eslint": "^8.48.0",
     "vitepress": "^1.6.4",
     "vitest": "^2.1.9"
   },
@@ -81,7 +80,9 @@
     "url": "https://github.com/iamtemi/schemabridge/issues"
   },
   "files": [
-    "dist",
+    "dist/index.js",
+    "dist/index.d.ts",
+    "dist/core",
     "bin",
     "README.md",
     "LICENSE"

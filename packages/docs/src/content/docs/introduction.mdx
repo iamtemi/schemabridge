@@ -23,9 +23,9 @@ I hit this in TypeScript-first projects that later added Python services. JSON S
 import { z } from 'zod';
 
 export const userSchema = z.object({
-  id: z.string().uuid(),
+  id: z.uuid(),
   name: z.string(),
-  email: z.string().email(),
+  email: z.email(),
   birthdate: z.date().optional(),
   role: z.enum(['admin', 'viewer']),
 });
@@ -35,15 +35,21 @@ export const userSchema = z.object({
 
 ```python
 from pydantic import BaseModel
-from typing import Literal, Optional
+from typing import Optional
+from enum import Enum
+from datetime import date
 from uuid import UUID
+
+class RoleEnum(str, Enum):
+    ADMIN = "admin"
+    VIEWER = "viewer"
 
 class UserSchema(BaseModel):
     id: UUID
     name: str
     email: str
     birthdate: Optional[date] = None
-    role: Literal["admin", "viewer"]
+    role: RoleEnum
 ```
 
 ## What you can do

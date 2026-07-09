@@ -38,8 +38,8 @@ Python users: `pip install schemabridge` also works, but it still needs Node 18+
 import { z } from 'zod';
 
 export const userSchema = z.object({
-  id: z.string().uuid(),
-  email: z.string().email(),
+  id: z.uuid(),
+  email: z.email(),
   createdAt: z.date(),
 });
 ```
@@ -64,6 +64,6 @@ schemabridge convert folder ./src/schemas --out ./generated --to pydantic --init
 
 ## Tips
 
-- Use Zod v4 helpers directly: `z.date()`, `z.string().uuid()`, `z.string().email()`. Avoid `z.string().datetime()` (deprecated).
+- Use Zod v4 helpers directly: `z.date()`, `z.coerce.date()`, `z.uuid()`, `z.email()`. Use string datetime helpers only when you want string output.
 - For TypeScript path aliases, run from the project root so `tsconfig.json` is picked up.
-- If a TS file won’t load, ensure `tsx` is installed during dev, or compile TS to JS first.\*\*\*
+- If a TS file won't load, ensure `tsx` is installed during dev, or compile TS to JS first.

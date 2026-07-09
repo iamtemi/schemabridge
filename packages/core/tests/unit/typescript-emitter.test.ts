@@ -794,4 +794,22 @@ describe('Parity tests with Zod inference', () => {
 
     assertValidTypeScriptSyntax(code);
   });
+
+  it('treats primitive values in object shapes as literals', () => {
+    const asShapeValue = (value: unknown) => value as z.ZodType;
+    const schema = z.object({
+      scope: asShapeValue('entry'),
+      priority: asShapeValue(1),
+      enabled: asShapeValue(true),
+      empty: asShapeValue(null),
+    });
+
+    const code = convertZodToTypescript(schema, { name: 'PrimitiveShape' });
+
+    expect(code).toContain('scope: "entry";');
+    expect(code).toContain('priority: 1;');
+    expect(code).toContain('enabled: true;');
+    expect(code).toContain('empty: null;');
+    assertValidTypeScriptSyntax(code);
+  });
 });

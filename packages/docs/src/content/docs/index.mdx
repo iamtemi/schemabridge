@@ -37,8 +37,8 @@ That means a single source of truth for validation, types, and runtime models—
 import { z } from 'zod';
 
 export const userSchema = z.object({
-  id: z.string().uuid(),
-  email: z.string().email(),
+  id: z.uuid(),
+  email: z.email(),
   createdAt: z.date(),
 });
 ```
@@ -50,13 +50,13 @@ export const userSchema = z.object({
 ```python
 from pydantic import BaseModel
 from uuid import UUID
-from datetime import datetime
+from datetime import date
 
 
 class UserSchema(BaseModel):
     id: UUID
     email: str
-    createdAt: datetime
+    createdAt: date
 ```
 
 </Card>

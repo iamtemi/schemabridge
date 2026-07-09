@@ -7,32 +7,12 @@
 
 import { spawn } from 'node:child_process';
 
-export interface PythonValidationResult {
+interface PythonValidationResult {
   valid: boolean;
   error?: string;
 }
 
-/**
- * Validate Python code syntax by compiling it with Python's AST parser.
- *
- * This function uses Python's `ast.parse()` to validate syntax without executing the code.
- * It does not require runtime dependencies (like pydantic) to be installed.
- *
- * @param code - The Python code to validate
- * @returns Promise resolving to validation result with any error messages
- *
- * @example
- * ```typescript
- * const result = await validatePythonSyntax('class Test: pass');
- * if (!result.valid) {
- *   console.error('Syntax error:', result.error);
- * }
- * ```
- */
-export async function validatePythonSyntax(code: string): Promise<PythonValidationResult> {
-  // Use Python's ast.parse() to validate syntax without executing
-  // This is safer than -c because it doesn't require imports to be available
-  const pythonScript = `
+const PYTHON_SYNTAX_CHECK_SCRIPT = `
 import ast
 import sys
 
@@ -48,8 +28,11 @@ except Exception as e:
     sys.exit(1)
 `.trim();
 
+async function validatePythonSyntax(code: string): Promise<PythonValidationResult> {
+  const pythonCommand = process.env.PYTHON || 'python3';
+
   return new Promise((resolve) => {
-    const proc = spawn('python3', ['-c', pythonScript], {
+    const proc = spawn(pythonCommand, ['-c', PYTHON_SYNTAX_CHECK_SCRIPT], {
       stdio: ['pipe', 'pipe', 'pipe'],
     });
 
@@ -68,25 +51,25 @@ except Exception as e:
     });
 
     proc.on('error', (err) => {
-      // Process spawn error (e.g., python3 not found)
       resolve({
         valid: false,
-        error: `Failed to spawn python3: ${err.message}`,
+        error: `Failed to spawn ${pythonCommand}: ${err.message}`,
       });
     });
 
     proc.on('close', (exitCode) => {
       if (exitCode === 0) {
         resolve({ valid: true });
-      } else {
-        resolve({
-          valid: false,
-          error:
-            stderr.trim() ||
-            stdout.trim() ||
-            `Python syntax validation failed with exit code ${exitCode}`,
-        });
+        return;
       }
+
+      resolve({
+        valid: false,
+        error:
+          stderr.trim() ||
+          stdout.trim() ||
+          `Python syntax validation failed with exit code ${exitCode}`,
+      });
     });
   });
 }

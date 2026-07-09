@@ -1,6 +1,10 @@
 packages:
   - 'packages/*'
 
+allowBuilds:
+  esbuild: false
+  sharp: false
+
 updateConfig:
   ignoreDependencies:
     - zod-v3

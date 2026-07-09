@@ -1,0 +1,7 @@
+# Generated bundles
+bin/**/*.js
+
+# Build/test output
+dist/
+coverage/
+*.tsbuildinfo

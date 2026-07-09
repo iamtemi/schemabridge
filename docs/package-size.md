@@ -1,39 +1,27 @@
-# Package Size Optimization
+# Package Size
 
-SchemaBridge is optimized for minimal package size while maintaining full functionality.
+SchemaBridge keeps the published npm package small by shipping only runtime files.
 
-## Current Size
+## Current Measured Size
 
-- **Package tarball**: ~37 kB (compressed)
-- **Unpacked size**: ~147 kB
+Measured with `npm pack --dry-run` after building `@schemabridge/core`:
 
-## What's Excluded
+- **Package tarball**: ~36.8 kB compressed
+- **Unpacked size**: ~151.6 kB
+- **CLI bundle**: ~42.7 kB
 
-To keep the package small, we exclude:
+## What Ships
 
-- **Source maps** (`.map` files) - Not needed for runtime, only for debugging library internals
-- **Test files** - Not needed for production use
-- **Development configs** - TypeScript configs, ESLint, etc.
-- **Source TypeScript files** - Only compiled JavaScript and type definitions are included
+- `bin/schemabridge.js` - the minified CLI bundle
+- `dist/index.*` - the public API entry point
+- `dist/core/**` - runtime modules used by the public API
+- `package.json` metadata
 
-## Impact on Users
+## What Does Not Ship
 
-**No functional impact** - All features work exactly the same. The only difference is:
+- Source TypeScript files
+- Tests, fixtures, coverage, and development config
+- Source maps
+- Duplicate private build outputs such as `dist/cli` and `dist/utils`
 
-- **Stack traces** in errors will point to compiled JavaScript instead of original TypeScript
-- **Debugging** the library's internal code is slightly harder (but most users don't need this)
-
-## Development vs Production
-
-- **Development** (`tsconfig.json`): Source maps enabled for contributors
-- **Production build** (`tsconfig.build.json`): Source maps disabled for smaller package size
-
-This follows industry best practices (similar to AWS SDK, many other npm packages).
-
-## If You Need Source Maps
-
-If you're contributing to SchemaBridge and need source maps for debugging:
-
-1. Clone the repository
-2. Run `pnpm install && pnpm build`
-3. Source maps will be generated in `dist/` for local development
+This has no runtime feature impact. Stack traces point at compiled JavaScript instead of source TypeScript.

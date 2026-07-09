@@ -89,7 +89,7 @@ interface GraphOptions {
   allowUnresolved?: boolean;
 }
 
-export async function buildDependencyGraph(
+async function buildDependencyGraph(
   entry: string,
   options: GraphOptions,
 ): Promise<{ warnings: string[]; dependencies: string[] }> {
@@ -104,36 +104,54 @@ export async function buildDependencyGraph(
     if (!file || visited.has(file)) continue;
     visited.add(file);
 
-    let source: string;
-    try {
-      source = await fs.readFile(file, 'utf8');
-    } catch {
-      continue;
-    }
-    const dir = path.dirname(file);
-    const sf = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true);
-    const imports = sf.statements.filter(ts.isImportDeclaration);
-    for (const imp of imports) {
-      if (!imp.moduleSpecifier || !ts.isStringLiteral(imp.moduleSpecifier)) continue;
-      const spec = imp.moduleSpecifier.text;
+    const imports = await readImportSpecifiers(file);
+    if (!imports) continue;
 
-      const resolved = await resolveModuleSpecifier(spec, dir, tsconfig);
-      if (resolved === null) {
-        // External or built-in; skip
-        continue;
-      }
-      if (!resolved) {
-        if (options.allowUnresolved) {
-          warnings.push(`Unresolved import "${spec}" from ${file}`);
-          continue;
-        }
-        throw new SchemaLoadError(`Failed to resolve import "${spec}" from ${file}`);
-      }
-      queue.push(resolved);
+    const containingDir = path.dirname(file);
+    for (const spec of imports) {
+      const resolved = await resolveModuleSpecifier(spec, containingDir, tsconfig);
+      const nextFile = resolveQueuedImport(file, spec, resolved, options, warnings);
+      if (nextFile) queue.push(nextFile);
     }
   }
 
   return { warnings, dependencies: Array.from(visited) };
+}
+
+async function readImportSpecifiers(file: string): Promise<string[] | null> {
+  try {
+    const source = await fs.readFile(file, 'utf8');
+    const sourceFile = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true);
+    return sourceFile.statements.filter(ts.isImportDeclaration).flatMap((importDeclaration) => {
+      if (
+        !importDeclaration.moduleSpecifier ||
+        !ts.isStringLiteral(importDeclaration.moduleSpecifier)
+      ) {
+        return [];
+      }
+      return [importDeclaration.moduleSpecifier.text];
+    });
+  } catch {
+    return null;
+  }
+}
+
+function resolveQueuedImport(
+  file: string,
+  spec: string,
+  resolved: string | null | undefined,
+  options: GraphOptions,
+  warnings: string[],
+): string | null {
+  if (resolved === null) return null;
+  if (!resolved) {
+    if (options.allowUnresolved) {
+      warnings.push(`Unresolved import "${spec}" from ${file}`);
+      return null;
+    }
+    throw new SchemaLoadError(`Failed to resolve import "${spec}" from ${file}`);
+  }
+  return resolved;
 }
 
 async function readTsconfig(tsconfigPath: string): Promise<ts.ParsedCommandLine | undefined> {
@@ -177,28 +195,35 @@ function resolveWithPaths(
   paths: Record<string, readonly string[]>,
 ): string | null {
   for (const [pattern, replacements] of Object.entries(paths)) {
-    const starIndex = pattern.indexOf('*');
-    if (starIndex === -1) {
-      if (pattern === spec && replacements.length > 0) {
-        const replacement = replacements[0];
-        if (replacement) {
-          return path.resolve(baseUrl, replacement);
-        }
-      }
-      continue;
-    }
-    const prefix = pattern.slice(0, starIndex);
-    const suffix = pattern.slice(starIndex + 1);
-    if (spec.startsWith(prefix) && spec.endsWith(suffix) && replacements.length > 0) {
-      const replacement = replacements[0];
-      if (replacement) {
-        const matched = spec.slice(prefix.length, spec.length - suffix.length);
-        const replaced = replacement.replace('*', matched);
-        return path.resolve(baseUrl, replaced);
-      }
+    const matched = matchPathPattern(spec, pattern, replacements);
+    if (matched) {
+      return path.resolve(baseUrl, matched);
     }
   }
   return null;
+}
+
+function matchPathPattern(
+  spec: string,
+  pattern: string,
+  replacements: readonly string[],
+): string | null {
+  const replacement = replacements[0];
+  if (!replacement) return null;
+
+  const starIndex = pattern.indexOf('*');
+  if (starIndex === -1) {
+    return pattern === spec ? replacement : null;
+  }
+
+  const prefix = pattern.slice(0, starIndex);
+  const suffix = pattern.slice(starIndex + 1);
+  if (!spec.startsWith(prefix) || !spec.endsWith(suffix)) {
+    return null;
+  }
+
+  const matched = spec.slice(prefix.length, spec.length - suffix.length);
+  return replacement.replace('*', matched);
 }
 
 async function resolveWithExtensions(basePath: string): Promise<string | null> {
