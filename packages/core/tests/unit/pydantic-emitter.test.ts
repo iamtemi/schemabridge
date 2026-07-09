@@ -476,4 +476,22 @@ describe('Enum support', () => {
 
     await assertValidPythonSyntax(code);
   });
+
+  it('treats primitive values in object shapes as literals', async () => {
+    const asShapeValue = (value: unknown) => value as z.ZodType;
+    const schema = z.object({
+      scope: asShapeValue('entry'),
+      priority: asShapeValue(1),
+      enabled: asShapeValue(true),
+      empty: asShapeValue(null),
+    });
+
+    const code = convertZodToPydantic(schema, { name: 'PrimitiveShape' });
+
+    expect(code).toContain('scope: Literal["entry"]');
+    expect(code).toContain('priority: Literal[1]');
+    expect(code).toContain('enabled: Literal[True]');
+    expect(code).toContain('empty: Literal[None]');
+    await assertValidPythonSyntax(code);
+  });
 });

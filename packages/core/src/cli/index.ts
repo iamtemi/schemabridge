@@ -17,6 +17,8 @@ type FolderArgs = {
   allowUnresolved: boolean;
   flat: boolean;
   generateInitFiles: boolean;
+  clean: boolean;
+  verify: boolean;
   /** Optional export name pattern (wildcard, e.g. "*Schema") for folder mode */
   exportNamePattern?: string;
   tsconfigPath?: string;
@@ -41,7 +43,7 @@ type ParsedArgs = FolderArgs | FileArgs;
 const USAGE = `
 Usage:
   schemabridge convert zod <input-file> --export <schema-name> [--to pydantic|typescript|all] [--out <path>] [--allow-unresolved] [--enum-style enum|literal] [--enum-base-type str|int]
-  schemabridge convert folder <source-dir> --out <output-dir> [--to pydantic|typescript|all] [--flat] [--init] [--export-pattern <pattern>] [--allow-unresolved] [--enum-style enum|literal] [--enum-base-type str|int]
+  schemabridge convert folder <source-dir> --out <output-dir> [--to pydantic|typescript|all] [--flat] [--init] [--clean] [--verify] [--export-pattern <pattern>] [--allow-unresolved] [--enum-style enum|literal] [--enum-base-type str|int]
 
 Commands:
   convert zod    Convert a single Zod schema from a file
@@ -66,6 +68,9 @@ Examples:
   # Generate __init__.py files for Python packages
   schemabridge convert folder ./src/schemas --out ./generated --to pydantic --init
 
+  # Verify generated files are current without writing
+  schemabridge convert folder ./src/schemas --out ./generated --to pydantic --verify
+
   # Only convert exports whose names match a pattern (e.g. *Schema)
   schemabridge convert folder ./src/schemas --out ./generated --to pydantic --export-pattern '*Schema'
 `.trim();
@@ -82,6 +87,8 @@ export async function runCLI(argv: string[] = process.argv.slice(2)): Promise<nu
         target: parsed.target,
         preserveStructure: !parsed.flat,
         generateInitFiles: parsed.generateInitFiles,
+        clean: parsed.clean,
+        verify: parsed.verify,
         registerTsLoader: true,
         trustedInput: true,
         allowUnresolved: parsed.allowUnresolved,
@@ -101,11 +108,31 @@ export async function runCLI(argv: string[] = process.argv.slice(2)): Promise<nu
         console.warn(`Skipped ${result.skippedFiles.length} files (no schemas found)`);
       }
 
-      for (const file of result.files) {
+      for (const error of result.errors) {
+        console.error(`Error: ${error}`);
+      }
+
+      for (const file of result.files.filter((file) => file.action === 'written')) {
         console.log(`Wrote ${file.target}: ${file.path}`);
       }
 
-      console.log(`\nConverted ${result.files.length} schema(s) successfully.`);
+      if (result.deleted > 0) {
+        console.log(`Deleted ${result.deleted} stale generated file(s).`);
+      }
+
+      console.log(
+        `\nSync summary: written ${result.written}, unchanged ${result.unchanged}, deleted ${result.deleted}, out of date ${result.outOfDate}.`,
+      );
+
+      if (result.errors.length > 0) {
+        return 1;
+      }
+
+      if (parsed.verify && result.outOfDate > 0) {
+        console.error(`Generated files are out of date (${result.outOfDate}).`);
+        return 1;
+      }
+
       return 0;
     }
 
@@ -304,6 +331,8 @@ function parseFolderArgs(rest: string[]): FolderArgs {
   let allowUnresolved = false;
   let flat = false;
   let generateInitFiles = false;
+  let clean = false;
+  let verify = false;
   let exportNamePattern: string | undefined;
   let tsconfigPath: string | undefined;
   let enumStyle: 'enum' | 'literal' | undefined;
@@ -341,6 +370,12 @@ function parseFolderArgs(rest: string[]): FolderArgs {
         break;
       case '--init':
         generateInitFiles = true;
+        break;
+      case '--clean':
+        clean = true;
+        break;
+      case '--verify':
+        verify = true;
         break;
       case '--export-pattern': {
         const val = rest[++i];
@@ -401,6 +436,8 @@ function parseFolderArgs(rest: string[]): FolderArgs {
     allowUnresolved,
     flat,
     generateInitFiles,
+    clean,
+    verify,
     ...(exportNamePattern !== undefined && { exportNamePattern }),
     ...(tsconfigPath !== undefined && { tsconfigPath }),
     ...(enumStyle !== undefined && { enumStyle }),

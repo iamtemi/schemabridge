@@ -22,6 +22,11 @@ schemabridge convert folder ./src/schemas --out ./generated --to pydantic --init
 
 - Preserves structure; use `--flat` for a single directory.
 - `--init` drops `__init__.py` files so Python imports work.
+- Re-running the command skips files that are already correct.
+- Use `--verify` in CI to check whether generated files are current without writing.
+- Use `--clean` to delete stale files that SchemaBridge generated in earlier runs.
+
+Generated files include a marker comment. `--clean` only deletes stale files with that marker, so hand-written files in flat output folders are left alone.
 
 ## Schema Types Supported
 
@@ -67,6 +72,8 @@ export const ipv4 = z.ipv4();
 - `--out <file|dir>`
 - `--flat` (folder mode)
 - `--init` (folder mode, Python packages)
+- `--verify` (folder mode, fail if generated files are out of date without writing)
+- `--clean` (folder mode, delete stale SchemaBridge-generated files)
 - `--allow-unresolved` (warn/continue on import issues)
 - `--tsconfig <path>` (folder/file mode; uses tsx discovery if not set)
 - `--enum-style enum|literal` (enum generation style, default: `enum`)

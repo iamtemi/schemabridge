@@ -74,7 +74,11 @@ export function visitZodSchema(schema: ZodType, path: string[] = []): VisitResul
   return { node, warnings };
 }
 
-function walkSchema(schema: ZodType, path: string[], warnings: VisitorWarning[]): SchemaNode {
+function walkSchema(schema: unknown, path: string[], warnings: VisitorWarning[]): SchemaNode {
+  if (isPrimitiveLiteralValue(schema)) {
+    return { type: 'literal', value: schema };
+  }
+
   const def = getSchemaDef(schema);
   if (!def || typeof def !== 'object') {
     throw new Error('Invalid Zod schema definition');
@@ -208,7 +212,7 @@ function walkSchema(schema: ZodType, path: string[], warnings: VisitorWarning[])
 
     case 'object':
     case 'ZodObject': {
-      const shapeGetter = defObj.shape as (() => Record<string, ZodType>) | Record<string, ZodType>;
+      const shapeGetter = defObj.shape as (() => Record<string, unknown>) | Record<string, unknown>;
       const shape = typeof shapeGetter === 'function' ? shapeGetter() : shapeGetter;
       const fields: Record<string, SchemaNode> = {};
       for (const [key, value] of Object.entries(shape)) {
@@ -268,11 +272,20 @@ function walkSchema(schema: ZodType, path: string[], warnings: VisitorWarning[])
   }
 }
 
-function isZod4(schema: ZodType): schema is ZodType & { _zod: { def: unknown } } {
+function isPrimitiveLiteralValue(value: unknown): value is string | number | boolean | null {
+  return (
+    value === null ||
+    typeof value === 'string' ||
+    typeof value === 'number' ||
+    typeof value === 'boolean'
+  );
+}
+
+function isZod4(schema: unknown): schema is ZodType & { _zod: { def: unknown } } {
   return typeof schema === 'object' && schema !== null && '_zod' in schema;
 }
 
-function getSchemaDef(schema: ZodType): unknown {
+function getSchemaDef(schema: unknown): unknown {
   if (isZod4(schema)) {
     return (schema as { _zod: { def: unknown } })._zod.def;
   }

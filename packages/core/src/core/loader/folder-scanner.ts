@@ -141,7 +141,9 @@ async function findSchemaFiles(
   const extSet = new Set(extensions);
 
   async function walk(currentDir: string): Promise<void> {
-    const entries = await fs.readdir(currentDir, { withFileTypes: true });
+    const entries = (await fs.readdir(currentDir, { withFileTypes: true })).sort((a, b) =>
+      compareLexicographic(a.name, b.name),
+    );
 
     for (const entry of entries) {
       const fullPath = path.join(currentDir, entry.name);
@@ -185,7 +187,8 @@ async function extractSchemasFromFile(
 
   // Check all exports for Zod schemas
   const schemas: SchemaExport[] = [];
-  for (const [exportName, value] of Object.entries(mod)) {
+  const exports = Object.entries(mod).sort(([a], [b]) => compareLexicographic(a, b));
+  for (const [exportName, value] of exports) {
     if (exportName === 'default') continue;
     if (looksLikeZodSchema(value)) {
       schemas.push({
@@ -207,4 +210,10 @@ function wildcardToRegExp(pattern: string): RegExp {
   // Escape regex special characters, then replace '*' with '.*'
   const escaped = pattern.replace(/[-/\\^$+?.()|[\]{}]/g, '\\$&').replace(/\*/g, '.*');
   return new RegExp(`^${escaped}$`);
+}
+
+function compareLexicographic(a: string, b: string): number {
+  if (a < b) return -1;
+  if (a > b) return 1;
+  return 0;
 }
